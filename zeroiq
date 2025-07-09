@@ -1,0 +1,3698 @@
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Core variables
+local rideEnabled = false
+local verticalSpeed = 400 -- Speed for vertical movement
+local horizontalSpeed = 0 -- Speed for horizontal movement
+local verticalInput = 0
+local currentCategory = "Steal" -- Default category
+local autolockEnabled = false
+local autolockConnection = nil
+
+-- Autobuy variables
+local autobuyEnabled = false
+local minPrice = 0
+local autobuyConnection = nil
+local lastPrompt = 0
+local SPEED, FORCE_GAIN = 40, 40
+
+-- Create main GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "RobloxCoreGuiDefaultChat"
+gui.ResetOnSpawn = false
+
+local fake = Instance.new("LocalScript", gui)
+fake.Name = "Main"
+
+local weld = nil
+
+-- Ultra Modern Dark UI - Original size
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 210) -- Original size
+mainFrame.Position = UDim2.new(1, -260, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+
+-- Rounded corners
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+-- Gradient background
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
+}
+gradient.Rotation = 45
+gradient.Parent = mainFrame
+
+-- Neon border
+local borderTop = Instance.new("Frame")
+borderTop.Name = "NeonBorderTop"
+borderTop.Size = UDim2.new(0.9, 0, 0, 2)
+borderTop.Position = UDim2.new(0.05, 0, 0, 0)
+borderTop.BorderSizePixel = 0
+borderTop.ZIndex = 2
+borderTop.Parent = mainFrame
+
+local borderGradient = Instance.new("UIGradient")
+borderGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+}
+borderGradient.Parent = borderTop
+
+-- Animate gradient
+spawn(function()
+    local offset = 0
+    while wait() do
+        offset = (offset + 0.005) % 1
+        borderGradient.Offset = Vector2.new(offset, 0)
+    end
+end)
+
+-- Title bar with logo
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundTransparency = 1
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local logoCircle = Instance.new("Frame")
+logoCircle.Name = "LogoCircle"
+logoCircle.Size = UDim2.new(0, 30, 0, 30)
+logoCircle.Position = UDim2.new(0, 10, 0, 5)
+logoCircle.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+logoCircle.BorderSizePixel = 0
+logoCircle.ZIndex = 2
+logoCircle.Parent = titleBar
+
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(1, 0)
+logoCorner.Parent = logoCircle
+
+local logoIcon = Instance.new("TextLabel")
+logoIcon.Name = "Icon"
+logoIcon.Size = UDim2.new(1, 0, 1, 0)
+logoIcon.BackgroundTransparency = 1
+logoIcon.ZIndex = 3
+logoIcon.Font = Enum.Font.GothamBold
+logoIcon.Text = "L"
+logoIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+logoIcon.TextSize = 18
+logoIcon.Parent = logoCircle
+
+local titleText = Instance.new("TextLabel")
+titleText.Name = "Title"
+titleText.Size = UDim2.new(0, 140, 0, 30)
+titleText.Position = UDim2.new(0, 50, 0, 5)
+titleText.BackgroundTransparency = 1
+titleText.ZIndex = 2
+titleText.Font = Enum.Font.GothamBold
+titleText.Text = "LEVIATHAN"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.TextSize = 14
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local subtitleText = Instance.new("TextLabel")
+subtitleText.Name = "Subtitle"
+subtitleText.Size = UDim2.new(0, 140, 0, 20)
+subtitleText.Position = UDim2.new(0, 50, 0, 20)
+subtitleText.BackgroundTransparency = 1
+subtitleText.ZIndex = 2
+subtitleText.Font = Enum.Font.Gotham
+subtitleText.Text = "BETA"
+
+if game.Players.LocalPlayer.Name == "pycc_proLoL" then
+subtitleText.Text = "OWNER EDITION"
+end
+
+subtitleText.TextColor3 = Color3.fromRGB(150, 150, 200)
+subtitleText.TextSize = 11
+subtitleText.TextXAlignment = Enum.TextXAlignment.Left
+subtitleText.Parent = titleBar
+
+-- Divider under title
+local divider = Instance.new("Frame")
+divider.Name = "Divider"
+divider.Size = UDim2.new(1, -20, 0, 1)
+divider.Position = UDim2.new(0, 10, 0, 45)
+divider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+divider.BorderSizePixel = 0
+divider.Transparency = 0.7
+divider.Parent = mainFrame
+
+-- Category navigation bar
+local categoryBar = Instance.new("Frame")
+categoryBar.Name = "CategoryBar"
+categoryBar.Size = UDim2.new(1, -20, 0, 30)
+categoryBar.Position = UDim2.new(0, 10, 0, 50)
+categoryBar.BackgroundTransparency = 1
+categoryBar.Parent = mainFrame
+
+-- Function to create category buttons
+local function createCategoryButton(name, text, position)
+    local button = Instance.new("Frame")
+    button.Name = name.."Button"
+    button.Size = UDim2.new(0, 75, 0, 24)
+    button.Position = position
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    button.BorderSizePixel = 0
+    button.Parent = categoryBar
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    
+    local buttonText = Instance.new("TextLabel")
+    buttonText.Name = "ButtonText"
+    buttonText.Size = UDim2.new(1, 0, 1, 0)
+    buttonText.BackgroundTransparency = 1
+    buttonText.Font = Enum.Font.GothamSemibold
+    buttonText.Text = text
+    buttonText.TextColor3 = Color3.fromRGB(200, 200, 255)
+    buttonText.TextSize = 12
+    buttonText.Parent = button
+    
+    local indicator = Instance.new("Frame")
+    indicator.Name = "Indicator"
+    indicator.Size = UDim2.new(1, 0, 0, 2)
+    indicator.Position = UDim2.new(0, 0, 1, -2)
+    indicator.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    indicator.BorderSizePixel = 0
+    indicator.Visible = (name == currentCategory)
+    indicator.Parent = button
+    
+    local detector = Instance.new("TextButton")
+    detector.Name = "Detector"
+    detector.Size = UDim2.new(1, 0, 1, 0)
+    detector.BackgroundTransparency = 1
+    detector.Text = ""
+    detector.Parent = button
+    
+    return button
+end
+
+-- Create category buttons
+local stealButton = createCategoryButton("Steal", "STEAL", UDim2.new(0, 0, 0, 0))
+local playerButton = createCategoryButton("Player", "PLAYER", UDim2.new(0.5, -37, 0, 0))
+local autobuyButton = createCategoryButton("Autobuy", "AUTOBUY", UDim2.new(1, -75, 0, 0))
+
+-- Second divider under categories
+local divider2 = Instance.new("Frame")
+divider2.Name = "Divider2"
+divider2.Size = UDim2.new(1, -20, 0, 1)
+divider2.Position = UDim2.new(0, 10, 0, 85)
+divider2.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+divider2.BorderSizePixel = 0
+divider2.Transparency = 0.7
+divider2.Parent = mainFrame
+
+-- Content containers for each category
+local contentContainer = Instance.new("Frame")
+contentContainer.Name = "ContentContainer"
+contentContainer.Size = UDim2.new(1, 0, 1, -90)
+contentContainer.Position = UDim2.new(0, 0, 0, 90)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+-- Create content frames for each category
+local stealContent = Instance.new("Frame")
+stealContent.Name = "StealContent"
+stealContent.Size = UDim2.new(1, 0, 1, 0)
+stealContent.BackgroundTransparency = 1
+stealContent.Visible = (currentCategory == "Steal")
+stealContent.Parent = contentContainer
+
+local playerContent = Instance.new("Frame")
+playerContent.Name = "PlayerContent"
+playerContent.Size = UDim2.new(1, 0, 1, 0)
+playerContent.BackgroundTransparency = 1
+playerContent.Visible = (currentCategory == "Player")
+playerContent.Parent = contentContainer
+
+-- After creating playerContent frame, add this code to create the scrolling frame
+local playerScrollFrame = Instance.new("ScrollingFrame")
+playerScrollFrame.Name = "PlayerScrollFrame"
+playerScrollFrame.Size = UDim2.new(1, -20, 1, -20) -- Slightly smaller than parent to allow padding
+playerScrollFrame.Position = UDim2.new(0, 10, 0, 10)
+playerScrollFrame.BackgroundTransparency = 1
+playerScrollFrame.BorderSizePixel = 0
+playerScrollFrame.ScrollBarThickness = 4
+playerScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 150)
+playerScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
+playerScrollFrame.Parent = playerContent
+
+-- Style the scrollbar with rounded corners
+local scrollBarCorner = Instance.new("UICorner")
+scrollBarCorner.CornerRadius = UDim.new(0, 2)
+scrollBarCorner.Parent = playerScrollFrame
+
+-- Create a UIListLayout to automatically position buttons
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Name = "ButtonLayout"
+playerListLayout.Padding = UDim.new(0, 10) -- 10 pixel spacing between buttons
+playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playerListLayout.Parent = playerScrollFrame
+
+-- Add this function to update the canvas size whenever you add or remove buttons
+local function updatePlayerScrollCanvas()
+    -- Wait for the next frame for layout to update
+    task.defer(function()
+        -- Get total size of all children plus padding
+        local contentHeight = playerListLayout.AbsoluteContentSize.Y
+        
+        -- Set canvas size
+        playerScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+    end)
+end
+
+-- Call this function initially
+updatePlayerScrollCanvas()
+
+local autobuyContent = Instance.new("Frame")
+autobuyContent.Name = "AutobuyContent"
+autobuyContent.Size = UDim2.new(1, 0, 1, 0)
+autobuyContent.BackgroundTransparency = 1
+autobuyContent.Visible = (currentCategory == "Autobuy")
+autobuyContent.Parent = contentContainer
+
+-- Common button color
+local buttonColor = Color3.fromRGB(40, 40, 70)
+
+-- Button designs with modern style
+local function createStylishButton(name, text, size, position, color, parent)
+    local button = Instance.new("Frame")
+    button.Name = name
+    button.Size = size
+    button.Position = position
+    button.BackgroundColor3 = color
+    button.BorderSizePixel = 0
+    button.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+    
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    buttonStroke.Color = Color3.fromRGB(100, 100, 150)
+    buttonStroke.Thickness = 1
+    buttonStroke.Transparency = 0.7
+    buttonStroke.Parent = button
+    
+    local buttonGradient = Instance.new("UIGradient")
+    buttonGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, color),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(
+            math.clamp(color.R * 0.7 * 255, 0, 255),
+            math.clamp(color.G * 0.7 * 255, 0, 255),
+            math.clamp(color.B * 0.7 * 255, 0, 255)
+        ))
+    }
+    buttonGradient.Rotation = 90
+    buttonGradient.Parent = button
+    
+    local buttonText = Instance.new("TextLabel")
+    buttonText.Name = "ButtonText"
+    buttonText.Size = UDim2.new(1, 0, 1, 0)
+    buttonText.BackgroundTransparency = 1
+    buttonText.Font = Enum.Font.GothamSemibold
+    buttonText.Text = text
+    buttonText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    buttonText.TextSize = 16
+    buttonText.Parent = button
+    
+    local buttonDetector = Instance.new("TextButton")
+    buttonDetector.Name = "Detector"
+    buttonDetector.Size = UDim2.new(1, 0, 1, 0)
+    buttonDetector.BackgroundTransparency = 1
+    buttonDetector.Text = ""
+    buttonDetector.Parent = button
+    
+    return button
+end
+
+-- Create stylish textbox
+local function createStylishTextbox(name, placeholder, size, position, parent)
+    local textbox = Instance.new("Frame")
+    textbox.Name = name
+    textbox.Size = size
+    textbox.Position = position
+    textbox.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    textbox.BorderSizePixel = 0
+    textbox.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = textbox
+    
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    boxStroke.Color = Color3.fromRGB(100, 100, 150)
+    boxStroke.Thickness = 1
+    boxStroke.Transparency = 0.7
+    boxStroke.Parent = textbox
+    
+    local input = Instance.new("TextBox")
+    input.Name = "Input"
+    input.Size = UDim2.new(1, -16, 1, 0)
+    input.Position = UDim2.new(0, 8, 0, 0)
+    input.BackgroundTransparency = 1
+    input.Font = Enum.Font.Gotham
+    input.PlaceholderText = placeholder
+    input.PlaceholderColor3 = Color3.fromRGB(150, 150, 200)
+    input.Text = ""
+    input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    input.TextSize = 14
+    input.TextXAlignment = Enum.TextXAlignment.Left
+    input.Parent = textbox
+    
+    return textbox
+end
+
+-- Add content to Steal category - new teleport buttons
+local tpUpButton = createStylishButton("TpUpButton", "TP TO UP", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0.5, -110, 0, 10), 
+    buttonColor, 
+    stealContent)
+
+local tpDownButton = createStylishButton("TpDownButton", "TP TO DOWN", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0.5, -110, 0, 70), 
+    buttonColor, 
+    stealContent)
+
+-- Add Player category content
+local autolockButton = createStylishButton("AutolockButton", "AUTOLOCK", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0.5, -110, 0, 10),
+    buttonColor,
+    playerScrollFrame)
+
+local playerStatusLabel = Instance.new("TextLabel")
+playerStatusLabel.Name = "StatusLabel"
+playerStatusLabel.Size = UDim2.new(1, -20, 0, 25)
+playerStatusLabel.Position = UDim2.new(0, 10, 0, 70)
+playerStatusLabel.BackgroundTransparency = 1
+playerStatusLabel.Font = Enum.Font.Gotham
+playerStatusLabel.Text = "Status: Waiting for activation"
+playerStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+playerStatusLabel.TextSize = 14
+playerStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+playerStatusLabel.Parent = playerContent
+
+-- Add Autobuy category content - changed to use same color as other buttons
+local autobuyToggleButton = createStylishButton("AutobuyToggleButton", "ENABLE", 
+    UDim2.new(0, 220, 0, 40), 
+    UDim2.new(0.5, -110, 0, 5), 
+    buttonColor, -- Changed to match other buttons
+    autobuyContent)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, -20, 0, 25)
+statusLabel.Position = UDim2.new(0, 10, 0, 50)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Text = "Status: Disabled"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+statusLabel.TextSize = 14
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = autobuyContent
+
+local priceTextbox = createStylishTextbox("PriceTextbox", "Min price (e.g. 100000)", 
+    UDim2.new(0, 220, 0, 40), 
+    UDim2.new(0.5, -110, 0, 80), 
+    autobuyContent)
+
+-- Modern notification system (without shadow/glow)
+local notifSystem = Instance.new("Frame")
+notifSystem.Name = "NotificationSystem"
+notifSystem.Size = UDim2.new(1, 0, 1, 0)
+notifSystem.BackgroundTransparency = 1
+notifSystem.Parent = gui
+
+local notificationTemplate = Instance.new("Frame")
+notificationTemplate.Name = "NotificationTemplate"
+notificationTemplate.Size = UDim2.new(0, 280, 0, 70)
+notificationTemplate.Position = UDim2.new(1, 20, 1, -80)
+notificationTemplate.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+notificationTemplate.BorderSizePixel = 0
+notificationTemplate.Visible = false
+notificationTemplate.ZIndex = 10
+notificationTemplate.Parent = notifSystem
+
+local notifCorner = Instance.new("UICorner")
+notifCorner.CornerRadius = UDim.new(0, 10)
+notifCorner.Parent = notificationTemplate
+
+local notifLeft = Instance.new("Frame")
+notifLeft.Name = "LeftAccent"
+notifLeft.Size = UDim2.new(0, 4, 1, 0)
+notifLeft.BorderSizePixel = 0
+notifLeft.ZIndex = 11
+notifLeft.Parent = notificationTemplate
+
+local leftCorner = Instance.new("UICorner")
+leftCorner.CornerRadius = UDim.new(0, 4)
+leftCorner.Parent = notifLeft
+
+local notifIcon = Instance.new("Frame")
+notifIcon.Name = "Icon"
+notifIcon.Size = UDim2.new(0, 40, 0, 40)
+notifIcon.Position = UDim2.new(0, 15, 0, 15)
+notifIcon.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+notifIcon.BorderSizePixel = 0
+notifIcon.ZIndex = 11
+notifIcon.Parent = notificationTemplate
+
+local iconCorner = Instance.new("UICorner")
+iconCorner.CornerRadius = UDim.new(0, 10)
+iconCorner.Parent = notifIcon
+
+local iconGradient = Instance.new("UIGradient")
+iconGradient.Rotation = 45
+iconGradient.Parent = notifIcon
+
+local iconSymbol = Instance.new("TextLabel")
+iconSymbol.Name = "Symbol"
+iconSymbol.Size = UDim2.new(1, 0, 1, 0)
+iconSymbol.BackgroundTransparency = 1
+iconSymbol.ZIndex = 12
+iconSymbol.Font = Enum.Font.GothamBold
+iconSymbol.TextColor3 = Color3.fromRGB(255, 255, 255)
+iconSymbol.TextSize = 20
+iconSymbol.Parent = notifIcon
+
+local notifTitle = Instance.new("TextLabel")
+notifTitle.Name = "Title"
+notifTitle.Size = UDim2.new(1, -70, 0, 25)
+notifTitle.Position = UDim2.new(0, 65, 0, 10)
+notifTitle.BackgroundTransparency = 1
+notifTitle.ZIndex = 11
+notifTitle.Font = Enum.Font.GothamBold
+notifTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+notifTitle.TextSize = 14
+notifTitle.TextXAlignment = Enum.TextXAlignment.Left
+notifTitle.Parent = notificationTemplate
+
+local notifMessage = Instance.new("TextLabel")
+notifMessage.Name = "Message"
+notifMessage.Size = UDim2.new(1, -70, 0, 35)
+notifMessage.Position = UDim2.new(0, 65, 0, 30)
+notifMessage.BackgroundTransparency = 1
+notifMessage.ZIndex = 11
+notifMessage.Font = Enum.Font.Gotham
+notifMessage.TextColor3 = Color3.fromRGB(200, 200, 255)
+notifMessage.TextSize = 12
+notifMessage.TextWrapped = true
+notifMessage.TextXAlignment = Enum.TextXAlignment.Left
+notifMessage.Parent = notificationTemplate
+
+local progressBar = Instance.new("Frame")
+progressBar.Name = "ProgressBar"
+progressBar.Size = UDim2.new(1, 0, 0, 3)
+progressBar.Position = UDim2.new(0, 0, 1, -3)
+progressBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+progressBar.BorderSizePixel = 0
+progressBar.ZIndex = 11
+progressBar.Parent = notificationTemplate
+
+local progressCorner = Instance.new("UICorner")
+progressCorner.CornerRadius = UDim.new(0, 2)
+progressCorner.Parent = progressBar
+
+-- Rainbow gradient for progress bar
+local rainbowGradient = Instance.new("UIGradient")
+rainbowGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 150, 0)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 100, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 0, 255))
+}
+rainbowGradient.Parent = progressBar
+
+-- Animate rainbow gradient
+spawn(function()
+    local offset = 0
+    while wait() do
+        offset = (offset + 0.01) % 1
+        if rainbowGradient then
+            rainbowGradient.Offset = Vector2.new(offset, 0)
+        end
+    end
+end)
+
+-- Notification queue system
+local notificationQueue = {}
+local currentNotification = nil
+local isProcessingQueue = false
+
+local function processNotificationQueue()
+    if isProcessingQueue then return end
+    if #notificationQueue == 0 then return end
+    
+    isProcessingQueue = true
+    currentNotification = table.remove(notificationQueue, 1)
+    
+    -- Clone template
+    local notif = notificationTemplate:Clone()
+    notif.Parent = notifSystem
+    notif.Visible = true
+    
+    -- Set notification properties
+    local data = currentNotification
+    notif.LeftAccent.BackgroundColor3 = data.color
+    
+    -- Clone the gradient (fix for string call error)
+    local gradientClone = iconGradient:Clone()
+    gradientClone.Parent = notif.Icon
+    
+    -- Set gradient color
+    gradientClone.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, data.color),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(
+            math.clamp(data.color.R * 0.7 * 255, 0, 255),
+            math.clamp(data.color.G * 0.7 * 255, 0, 255),
+            math.clamp(data.color.B * 0.7 * 255, 0, 255)
+        ))
+    }
+    
+    notif.Icon.Symbol.Text = data.symbol
+    notif.Title.Text = data.title
+    notif.Message.Text = data.message
+    
+    -- Clone rainbow gradient
+    local rainbowClone = rainbowGradient:Clone()
+    rainbowClone.Parent = notif.ProgressBar
+    
+    -- Animate in
+    notif.Position = UDim2.new(1, 20, 1, -80)
+    local tweenIn = TweenService:Create(
+        notif,
+        TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(1, -290, 1, -80)}
+    )
+    tweenIn:Play()
+    
+    -- Animate progress bar
+    local progressTween = TweenService:Create(
+        notif.ProgressBar,
+        TweenInfo.new(data.duration, Enum.EasingStyle.Linear),
+        {Size = UDim2.new(0, 0, 0, 3)}
+    )
+    progressTween:Play()
+    
+    -- Remove after duration
+    delay(data.duration, function()
+        local tweenOut = TweenService:Create(
+            notif,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+            {Position = UDim2.new(1, 20, 1, -80)}
+        )
+        tweenOut:Play()
+        
+        tweenOut.Completed:Connect(function()
+            notif:Destroy()
+            currentNotification = nil
+            isProcessingQueue = false
+            
+            -- Process next notification if any
+            if #notificationQueue > 0 then
+                processNotificationQueue()
+            end
+        end)
+    end)
+end
+
+-- Show notification function with shorter duration
+local function showNotification(title, message, notifType, duration)
+    local data = {
+        title = title or "Notification",
+        message = message or "",
+        duration = duration or 2, -- Shorter default duration
+        symbol = "!",
+        color = Color3.fromRGB(0, 120, 255) -- Default blue
+    }
+    
+    -- Set type-specific properties
+    if notifType == "success" then
+        data.symbol = "☑️"
+        data.color = Color3.fromRGB(0, 200, 100)
+    elseif notifType == "warning" then
+        data.symbol = "⚠"
+        data.color = Color3.fromRGB(255, 150, 0)
+    elseif notifType == "error" then
+        data.symbol = "❌"
+        data.color = Color3.fromRGB(255, 50, 50)
+    end
+    
+    table.insert(notificationQueue, data)
+    
+    if not isProcessingQueue then
+        processNotificationQueue()
+    end
+end
+
+-- Function to switch between categories (simplified - no notification)
+local function switchCategory(newCategory)
+    if newCategory == currentCategory then return end
+    
+    -- Update category buttons
+    stealButton.Indicator.Visible = (newCategory == "Steal")
+    playerButton.Indicator.Visible = (newCategory == "Player")
+    autobuyButton.Indicator.Visible = (newCategory == "Autobuy")
+    
+    -- Get content frames
+    local currentContent = contentContainer:FindFirstChild(currentCategory.."Content")
+    local newContent = contentContainer:FindFirstChild(newCategory.."Content")
+    
+    if currentContent and newContent then
+        -- Simple visibility toggle instead of tween to avoid errors
+        currentContent.Visible = false
+        newContent.Visible = true
+    end
+    
+    currentCategory = newCategory
+    -- Removed notification for category change
+end
+
+-- Button click effects
+local function createClickEffect(button)
+    local clickEffect = Instance.new("Frame")
+    clickEffect.Name = "ClickEffect"
+    clickEffect.AnchorPoint = Vector2.new(0.5, 0.5)
+    clickEffect.Position = UDim2.new(0.5, 0, 0.5, 0)
+    clickEffect.Size = UDim2.new(0, 0, 0, 0)
+    clickEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    clickEffect.BackgroundTransparency = 0.8
+    clickEffect.ZIndex = button.ZIndex + 1
+    clickEffect.Parent = button
+    
+    local cornerEffect = Instance.new("UICorner")
+    cornerEffect.CornerRadius = UDim.new(1, 0)
+    cornerEffect.Parent = clickEffect
+    
+    -- Animate ripple effect
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(
+        clickEffect,
+        tweenInfo,
+        {
+            Size = UDim2.new(1.5, 0, 1.5, 0),
+            BackgroundTransparency = 1
+        }
+    )
+    tween:Play()
+    
+    tween.Completed:Connect(function()
+        clickEffect:Destroy()
+    end)
+end
+
+-- Teleport to UP function
+local function teleportUp()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = character.HumanoidRootPart
+    local currentPos = rootPart.Position
+    
+    -- Teleport 50 studs up
+    rootPart.CFrame = CFrame.new(currentPos.X, currentPos.Y + 200, currentPos.Z)
+end
+
+-- Teleport to ground level function
+local function teleportDown()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = character.HumanoidRootPart
+    local currentPos = rootPart.Position
+    local maxDistance = 10000 -- Maximum raycast distance
+    local currentDistance = 0
+    local rayOrigin = currentPos
+    
+    -- Raycast to find the ground
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {character}
+    
+    -- Keep raycasting until we find a non-transparent part or reach max distance
+    while currentDistance < maxDistance do
+        local rayDirection = Vector3.new(0, -1, 0) * (maxDistance - currentDistance)
+        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+        
+        if not raycastResult then
+            -- No more parts found, teleport to Y=0
+            rootPart.CFrame = CFrame.new(currentPos.X, 0, currentPos.Z)
+            return
+        end
+        
+        -- Check if the hit part is fully transparent
+        local hitPart = raycastResult.Instance
+        if hitPart:IsA("BasePart") and hitPart.Transparency >= 0.99 then
+            -- If the part is invisible, continue raycast from just below this part
+            local hitDistance = (raycastResult.Position - rayOrigin).Magnitude
+            currentDistance = currentDistance + hitDistance + 0.1 -- Add a small offset to avoid hitting same part
+            rayOrigin = raycastResult.Position + Vector3.new(0, -0.1, 0) -- Start next ray from just below
+        else
+            -- Found a non-transparent part, teleport above it
+            rootPart.CFrame = CFrame.new(currentPos.X, raycastResult.Position.Y + 1, currentPos.Z)
+            return
+        end
+    end
+    
+    -- If we somehow exit the loop without teleporting, default to Y=0
+    rootPart.CFrame = CFrame.new(currentPos.X, 0, currentPos.Z)
+end
+
+-- Completely rewritten Autolock function
+local function runAutolock()
+    if autolockEnabled then return end
+    
+    autolockEnabled = true
+    autolockButton.ButtonText.Text = "RUNNING..."
+    autolockButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+    playerStatusLabel.Text = "Status: Searching for your plot..."
+    
+    -- Main autolock process
+    task.spawn(function()
+        local PathfindingService = game:GetService("PathfindingService")
+        local plots = workspace:FindFirstChild("Plots")
+        
+        if not plots then
+            playerStatusLabel.Text = "Status: No plots found"
+            autolockEnabled = false
+            autolockButton.ButtonText.Text = "AUTOLOCK"
+            autolockButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- Clean up function
+        local function cleanupAutolock()
+            if autolockConnection then
+                autolockConnection:Disconnect()
+                autolockConnection = nil
+            end
+            
+            -- Clean up any VectorForce we created
+            local character = LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local rootPart = character.HumanoidRootPart
+                local vectorForce = rootPart:FindFirstChild("AutolockVectorForce")
+                if vectorForce then vectorForce:Destroy() end
+                local attachment = rootPart:FindFirstChild("AutolockAttachment")
+                if attachment then attachment:Destroy() end
+            end
+            
+            autolockEnabled = false
+            autolockButton.ButtonText.Text = "AUTOLOCK"
+            autolockButton.BackgroundColor3 = buttonColor
+        end
+        
+        -- Function to check if laser is gone
+        local function isLaserGone(plot)
+            if not plot:FindFirstChild("Laser") then return false end
+            if not plot.Laser:FindFirstChild("Model") then return false end
+            
+            -- Check model children
+            local modelChildren = plot.Laser.Model:GetChildren()
+            if #modelChildren == 0 then return false end
+            
+            -- Check if all parts are transparent
+            for _, part in pairs(modelChildren) do
+                if part:IsA("BasePart") and part.Transparency < 0.99 then
+                    return false
+                end
+            end
+            
+            return true
+        end
+        
+        -- Find your plot
+        for _, plot in pairs(plots:GetChildren()) do
+            if not autolockEnabled then cleanupAutolock(); return end
+            
+            task.wait(0.5)
+            local urbase = plot:FindFirstChild("YourBase", true)
+            
+            if urbase and urbase.Enabled then
+                playerStatusLabel.Text = "Status: Found your plot!"
+                
+                local purchases = plot:FindFirstChild("Purchases")
+                local plotBlock = purchases and purchases:FindFirstChild("PlotBlock")
+                
+                if not plotBlock then
+                    playerStatusLabel.Text = "Status: No plot block found"
+                    cleanupAutolock()
+                    return
+                end
+                
+                playerStatusLabel.Text = "Status: Waiting for laser to disappear..."
+                
+                -- Wait for laser to disappear
+                local startTime = tick()
+                local maxWaitTime = 360
+                
+                repeat
+                    if tick() - startTime > maxWaitTime then
+                        playerStatusLabel.Text = "Status: Timed out waiting for laser"
+                        cleanupAutolock()
+                        return
+                    end
+                    
+                    if not autolockEnabled then
+                        cleanupAutolock()
+                        return
+                    end
+                    
+                    task.wait(1)
+                    playerStatusLabel.Text = "Status: Waiting for laser... " .. math.floor(tick() - startTime) .. "s"
+                until isLaserGone(plot)
+                
+                playerStatusLabel.Text = "Status: Laser gone! Moving to plot block..."
+                
+                local hitbox = plotBlock:FindFirstChild("Hitbox")
+                if not hitbox then
+                    playerStatusLabel.Text = "Status: No hitbox found"
+                    cleanupAutolock()
+                    return
+                end
+                
+                -- Set up character and path finding
+                local character = LocalPlayer.Character
+                if not character or not character:FindFirstChild("HumanoidRootPart") then
+                    playerStatusLabel.Text = "Status: Character not found"
+                    cleanupAutolock()
+                    return
+                end
+                
+                local rootPart = character.HumanoidRootPart
+                
+                -- Create VectorForce
+                local attachment = Instance.new("Attachment")
+                attachment.Name = "AutolockAttachment"
+                attachment.Parent = rootPart
+                
+                local vectorForce = Instance.new("VectorForce")
+                vectorForce.Name = "AutolockVectorForce"
+                vectorForce.Attachment0 = attachment
+                vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+                vectorForce.ApplyAtCenterOfMass = true
+                vectorForce.Force = Vector3.new(0, 0, 0)
+                vectorForce.Parent = rootPart
+                
+                -- Path finding setup
+                local path = PathfindingService:CreatePath({
+                    AgentRadius = 2,
+                    AgentHeight = 5,
+                    AgentCanJump = true
+                })
+                
+                local waypoints = {}
+                local currentWaypointIndex = 0
+                local targetSpeed = 55 -- 40 studs per second (increased from 20)
+                
+                -- Function to compute a new path
+                local function computePath()
+                    path:ComputeAsync(rootPart.Position, hitbox.Position)
+                    if path.Status == Enum.PathStatus.Success then
+                        waypoints = path:GetWaypoints()
+                        currentWaypointIndex = 2 -- Start from the second waypoint
+                        playerStatusLabel.Text = "Status: Path found with " .. #waypoints .. " waypoints"
+                    else
+                        playerStatusLabel.Text = "Status: Failed to find path, using direct path"
+                        waypoints = {
+                            {Position = rootPart.Position, Action = Enum.PathWaypointAction.Walk},
+                            {Position = hitbox.Position, Action = Enum.PathWaypointAction.Walk}
+                        }
+                        currentWaypointIndex = 2
+                    end
+                end
+                
+                -- Initial path computation
+                computePath()
+                
+                -- Movement logic using VectorForce
+                local lastRecomputeTime = tick()
+                local distanceThreshold = 5 -- Increased from 3 to account for higher speed
+                
+                autolockConnection = RunService.Heartbeat:Connect(function()
+                    if not autolockEnabled or not character:IsDescendantOf(workspace) then
+                        cleanupAutolock()
+                        return
+                    end
+                    
+                    -- Check if we need to recompute the path (every 3 seconds)
+                    if tick() - lastRecomputeTime > 3 then
+                        computePath()
+                        lastRecomputeTime = tick()
+                    end
+                    
+                    -- If we have no waypoints, do nothing
+                    if #waypoints == 0 then
+                        vectorForce.Force = Vector3.new(0, 0, 0)
+                        return
+                    end
+                    
+                    -- Get current waypoint target
+                    local targetPosition = waypoints[currentWaypointIndex].Position
+                    
+                    -- Check if we've reached the current waypoint
+                    local distanceToWaypoint = (rootPart.Position - targetPosition).Magnitude
+                    if distanceToWaypoint < distanceThreshold then
+                        -- Move to next waypoint
+                        currentWaypointIndex = currentWaypointIndex + 1
+                        
+                        -- If we've reached the end of the path
+                        if currentWaypointIndex > #waypoints then
+                            playerStatusLabel.Text = "Status: Reached plot block!"
+                            cleanupAutolock()
+                            return
+                        end
+                    end
+                    
+                    -- Calculate movement direction and force
+                    local movementDirection = (targetPosition - rootPart.Position).Unit
+                    local targetVelocity = movementDirection * targetSpeed
+                    
+                    -- Look in the direction of movement
+                    rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(targetPosition.X, rootPart.Position.Y, targetPosition.Z))
+                    
+                    -- Apply force based on mass (F = ma)
+                    local mass = rootPart.AssemblyMass
+                    local currentVelocity = rootPart.AssemblyLinearVelocity
+                    local requiredForce = (targetVelocity - currentVelocity) * mass * 15 -- Increased multiplier for better responsiveness at higher speed
+                    
+                    -- Apply the force
+                    vectorForce.Force = requiredForce
+                    
+                    -- Update status
+                    playerStatusLabel.Text = "Status: Moving to plot block (" .. math.floor(distanceToWaypoint) .. " studs)"
+                    
+                    -- Check if we're very close to the final destination
+                    if currentWaypointIndex == #waypoints and distanceToWaypoint < 1 then
+                        playerStatusLabel.Text = "Status: Successfully reached plot block!"
+                        cleanupAutolock()
+                    end
+                end)
+                
+                -- We found our plot and started the process, so break out of the loop
+                break
+            end
+        end
+    end)
+end
+
+local function cancelAutolock()
+    if not autolockEnabled then return end
+    
+    autolockEnabled = false
+    autolockButton.ButtonText.Text = "AUTOLOCK"
+    autolockButton.BackgroundColor3 = buttonColor
+    playerStatusLabel.Text = "Status: Canceled"
+    
+    if autolockConnection then
+        autolockConnection:Disconnect()
+        autolockConnection = nil
+    end
+end
+
+-- AUTOBUY FUNCTIONS
+
+-- Price parsing
+local function parsePrice(str)
+    str = string.upper(str):gsub("%s","")
+    str = str:gsub("^%$", "")      -- Remove $ from start
+    local mult = 1
+    local suf = str:sub(-1)
+    if suf == "K" then 
+        mult, str = 1e3, str:sub(1, -2)
+    elseif suf == "M" then 
+        mult, str = 1e6, str:sub(1, -2)
+    elseif suf == "B" then 
+        mult, str = 1e9, str:sub(1, -2) 
+    end
+    return (tonumber(str) or 0) * mult
+end
+
+-- Animal finding functions
+local function getOverhead(model)
+    return model:FindFirstChild("AnimalOverhead", true)
+end
+
+local function getPrice(model)
+    local oh = getOverhead(model)
+    if not oh then return 0 end
+    
+    local lbl = oh:FindFirstChild("Price")
+    return (lbl and lbl:IsA("TextLabel")) and parsePrice(lbl.Text) or 0
+end
+
+local function findPrompt(m)
+    return m:FindFirstChildWhichIsA("ProximityPrompt", true)
+end
+
+local function pickAnimal(minPrice)
+    -- Look for animals in the workspace without rarity filtering
+    if not workspace:FindFirstChild("MovingAnimals") then return nil end
+    
+    for _, animal in ipairs(workspace.MovingAnimals:GetChildren()) do
+        if getPrice(animal) >= minPrice then
+            return animal
+        end
+    end
+    return nil
+end
+
+-- Set up autobuy function (with normal button color)
+local function setAutobuy(enabled)
+    if autobuyEnabled == enabled then return end
+    autobuyEnabled = enabled
+    
+    if autobuyEnabled then
+        autobuyToggleButton.ButtonText.Text = "DISABLE"
+        -- Keep button color the same
+    else
+        autobuyToggleButton.ButtonText.Text = "ENABLE"
+        -- Keep button color the same
+    end
+    
+    statusLabel.Text = "Status: " .. (autobuyEnabled and "Enabled" or "Disabled")
+    
+    if autobuyConnection then 
+        autobuyConnection:Disconnect()
+        autobuyConnection = nil
+    end
+    
+    if not autobuyEnabled then return end
+    
+    -- Set up the VectorForce for movement
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local att = Instance.new("Attachment", rootPart)
+    local vF = Instance.new("VectorForce")
+    vF.Attachment0 = att
+    vF.RelativeTo = Enum.ActuatorRelativeTo.World
+    vF.ApplyAtCenterOfMass = true
+    vF.Parent = rootPart
+    local mass = rootPart.AssemblyMass
+    
+    -- Main autobuy loop
+    autobuyConnection = RunService.Heartbeat:Connect(function()
+        local animal = pickAnimal(minPrice)
+        if not animal then
+            statusLabel.Text = "Status: Enabled (waiting...)"
+            vF.Force = Vector3.new(0, 0, 0)
+            return
+        end
+        
+        statusLabel.Text = "Status: Enabled (" .. animal.Name .. ")"
+        local animalRoot = animal:FindFirstChild("HumanoidRootPart")
+        if not animalRoot then return end
+        
+        -- Movement
+        local myPos = rootPart.Position
+        local targetPos = animalRoot.Position
+        rootPart.CFrame = CFrame.lookAt(myPos, Vector3.new(targetPos.X, myPos.Y, targetPos.Z))
+        local desired = rootPart.CFrame.LookVector * SPEED
+        vF.Force = (desired - rootPart.AssemblyLinearVelocity) * mass * FORCE_GAIN
+        
+        -- Try to trigger prompt
+        local prompt = findPrompt(animal)
+        if prompt and prompt.Parent then
+            local part = prompt.Parent:IsA("BasePart") and prompt.Parent
+                      or prompt.Parent:FindFirstAncestorWhichIsA("BasePart")
+            
+            if part and (myPos - part.Position).Magnitude <= prompt.MaxActivationDistance then
+                local now = tick()
+                local cooldown = math.max(prompt.HoldDuration, 0.05)
+                
+                if now - lastPrompt >= cooldown then
+                    lastPrompt = now
+                    if rawget(_G, "firepromixityprompt") then
+                        (_G).firepromixityprompt(prompt)
+                    else
+                        pcall(function() fireproximityprompt(prompt, prompt.HoldDuration) end)
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Clean up VectorForce when script ends
+    task.spawn(function()
+        repeat wait() until not autobuyEnabled
+        if att then att:Destroy() end
+        if vF then vF:Destroy() end
+    end)
+end
+
+-- Connect category button events
+stealButton.Detector.MouseButton1Click:Connect(function()
+    switchCategory("Steal")
+    createClickEffect(stealButton)
+end)
+
+playerButton.Detector.MouseButton1Click:Connect(function()
+    switchCategory("Player")
+    createClickEffect(playerButton)
+end)
+
+autobuyButton.Detector.MouseButton1Click:Connect(function()
+    switchCategory("Autobuy")
+    createClickEffect(autobuyButton)
+end)
+
+-- Button hover effects for category buttons
+local function setupCategoryButtonEffects(button)
+    button.Detector.MouseEnter:Connect(function()
+        local tween = TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = Color3.fromRGB(50, 50, 80)}
+        )
+        tween:Play()
+    end)
+    
+    button.Detector.MouseLeave:Connect(function()
+        local tween = TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = Color3.fromRGB(30, 30, 50)}
+        )
+        tween:Play()
+    end)
+end
+
+setupCategoryButtonEffects(stealButton)
+setupCategoryButtonEffects(playerButton)
+setupCategoryButtonEffects(autobuyButton)
+
+-- Button hover effects for function buttons
+local function setupButtonEffects(button, normalColor, hoverColor)
+    button.Detector.MouseEnter:Connect(function()
+        local tween = TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = hoverColor}
+        )
+        tween:Play()
+    end)
+    
+    button.Detector.MouseLeave:Connect(function()
+        if button == autolockButton and autolockEnabled then
+            local tween = TweenService:Create(
+                button,
+                TweenInfo.new(0.2),
+                {BackgroundColor3 = Color3.fromRGB(220, 150, 40)}
+            )
+            tween:Play()
+            return
+        end
+        
+        local tween = TweenService:Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = normalColor}
+        )
+        tween:Play()
+    end)
+    
+    button.Detector.MouseButton1Down:Connect(function()
+        createClickEffect(button)
+    end)
+end
+
+-- Add this at the top with your other variables
+local antiknockEnabled = false
+local antiknockConnection = nil
+
+-- Function to check if character is ragdolled
+
+
+-- Function to start the antiknock
+local function startAntiknock()
+    if antiknockConnection then return end
+    
+    antiknockConnection = RunService.Heartbeat:Connect(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or not rootPart then return end
+        
+
+        
+            local desired = humanoid.MoveDirection * humanoid.WalkSpeed
+            local current = rootPart.AssemblyLinearVelocity
+            
+            -- Only modify horizontal velocity (X and Z), preserve vertical (Y)
+            rootPart.AssemblyLinearVelocity = Vector3.new(
+                desired.X, 
+                current.Y, 
+                desired.Z
+            )
+        
+    end)
+end
+
+-- Function to stop the antiknock
+local function stopAntiknock()
+    if antiknockConnection then
+        antiknockConnection:Disconnect()
+        antiknockConnection = nil
+    end
+end
+
+-- Add this after the autolockButton creation in the Player category
+local antiknockButton = createStylishButton("AntiknockButton", "ANTIKNOCK", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0.5, -110, 0, 70), -- Positioned below autolock button
+    buttonColor,
+    playerScrollFrame)
+
+-- Move the player status label down to accommodate the new button
+playerStatusLabel.Position = UDim2.new(0, 10, 0, 130)
+playerStatusLabel.Visible = false
+-- Add this after your other button event connections
+antiknockButton.Detector.MouseButton1Click:Connect(function()
+    antiknockEnabled = not antiknockEnabled
+    
+    if antiknockEnabled then
+        antiknockButton.ButtonText.Text = "DISABLE"
+        antiknockButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        startAntiknock()
+        
+    else
+        antiknockButton.ButtonText.Text = "ANTIKNOCK"
+        antiknockButton.BackgroundColor3 = buttonColor
+        stopAntiknock()
+        
+    end
+    
+    createClickEffect(antiknockButton)
+end)
+
+-- Add these variables at the top with your other state variables
+local espScannerEnabled = false
+local espHighlights = {}
+local espBillboards = {}
+local espUpdateConnection = nil
+local espPlayerAddedConnection = nil
+local espPlayerRemovingConnection = nil
+local espCharacterAddedConnections = {}
+
+-- Function to create rainbow effect for highlights
+local function updateRainbowHighlights()
+    local time = tick() * 0.5 -- Controls the speed of color change
+    local r = (math.sin(time) * 0.5 + 0.5)
+    local g = (math.sin(time + 2) * 0.5 + 0.5)
+    local b = (math.sin(time + 4) * 0.5 + 0.5)
+    
+    return Color3.new(r, g, b)
+end
+
+-- Function to get tool texture ID
+local function getToolTextureId(tool)
+    -- Try different approaches to find texture
+    if tool:IsA("Tool") and tool.TextureId and tool.TextureId ~= "" then
+        return tool.TextureId
+    end
+    
+    -- Check handle
+    local handle = tool:FindFirstChild("Handle")
+    if handle and handle:IsA("BasePart") and handle.Texture and handle.Texture ~= "" then
+        return handle.Texture
+    end
+    
+    -- Check for textures in descendants
+    for _, obj in pairs(tool:GetDescendants()) do
+        if obj:IsA("Decal") and obj.Texture and obj.Texture ~= "" then
+            return obj.Texture
+        end
+        if obj:IsA("BasePart") and obj.Texture and obj.Texture ~= "" then
+            return obj.Texture
+        end
+        if obj:IsA("ImageLabel") and obj.Image and obj.Image ~= "" then
+            return obj.Image
+        end
+    end
+    
+    return nil
+end
+
+-- Function to clean up ESP for a player (declare before it's used)
+local function cleanupESP(userId)
+    -- Clean up highlight
+    if espHighlights[userId] then
+        if espHighlights[userId].Parent then
+            espHighlights[userId]:Destroy()
+        end
+        espHighlights[userId] = nil
+    end
+    
+    -- Clean up billboard and connections
+    if espBillboards[userId] then
+        if espBillboards[userId].connections then
+            for _, conn in pairs(espBillboards[userId].connections) do
+                if typeof(conn) == "RBXScriptConnection" and conn.Connected then
+                    conn:Disconnect()
+                end
+            end
+        end
+        
+        if espBillboards[userId].billboard and espBillboards[userId].billboard.Parent then
+            espBillboards[userId].billboard:Destroy()
+        end
+        
+        espBillboards[userId] = nil
+    end
+    
+    -- Clean up character connections
+    if espCharacterAddedConnections[userId] then
+        if typeof(espCharacterAddedConnections[userId]) == "RBXScriptConnection" and espCharacterAddedConnections[userId].Connected then
+            espCharacterAddedConnections[userId]:Disconnect()
+        end
+        espCharacterAddedConnections[userId] = nil
+    end
+end
+
+-- Function to create ESP for a character
+local function createESP(player, character)
+    if player == LocalPlayer then return end -- Skip local player
+    
+    -- First clean up any existing ESP for this player to prevent duplicates
+    cleanupESP(player.UserId)
+    
+    -- Create highlight with enhanced visibility for transparent parts
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight_" .. player.UserId
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 1
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Show through walls
+    highlight.Adornee = character
+    highlight.Parent = workspace.CurrentCamera -- Parent to camera to ensure it stays visible
+    
+    espHighlights[player.UserId] = highlight
+    
+    -- Create billboard GUI for tool display that works with invisible characters
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "ESPToolDisplay_" .. player.UserId
+    billboardGui.Size = UDim2.new(0, 100, 0, 80)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0) -- Above head
+    billboardGui.AlwaysOnTop = true
+    billboardGui.LightInfluence = 0
+    billboardGui.Adornee = character.PrimaryPart or character:FindFirstChildOfClass("Part")
+    billboardGui.Parent = workspace.CurrentCamera
+    
+    -- Create container frame
+    local toolFrame = Instance.new("Frame")
+    toolFrame.Name = "ToolFrame"
+    toolFrame.Size = UDim2.new(1, 0, 1, 0)
+    toolFrame.BackgroundTransparency = 1
+    toolFrame.Parent = billboardGui
+    
+    -- Create player name with background to ensure visibility
+    local nameBackground = Instance.new("Frame")
+    nameBackground.Name = "NameBackground"
+    nameBackground.Size = UDim2.new(1, 0, 0, 20)
+    nameBackground.Position = UDim2.new(0, 0, 0, 0)
+    nameBackground.BackgroundColor3 = Color3.new(0, 0, 0)
+    nameBackground.BackgroundTransparency = 0.5
+    nameBackground.Parent = toolFrame
+    
+    local nameCorner = Instance.new("UICorner")
+    nameCorner.CornerRadius = UDim.new(0, 4)
+    nameCorner.Parent = nameBackground
+    
+    local playerName = Instance.new("TextLabel")
+    playerName.Name = "PlayerName"
+    playerName.Size = UDim2.new(1, 0, 1, 0)
+    playerName.BackgroundTransparency = 1
+    playerName.TextColor3 = Color3.new(1, 1, 1)
+    playerName.TextStrokeTransparency = 0.5
+    playerName.TextStrokeColor3 = Color3.new(0, 0, 0)
+    playerName.Font = Enum.Font.GothamBold
+    playerName.TextSize = 14
+    playerName.Text = player.Name
+    playerName.Parent = nameBackground
+    
+    -- Create tool image
+    local toolImage = Instance.new("ImageLabel")
+    toolImage.Name = "ToolImage"
+    toolImage.Size = UDim2.new(0, 40, 0, 40)
+    toolImage.Position = UDim2.new(0.5, -20, 0, 20)
+    toolImage.BackgroundTransparency = 1
+    toolImage.Image = ""
+    toolImage.ScaleType = Enum.ScaleType.Fit
+    toolImage.Parent = toolFrame
+    
+    -- Create tool name label with background
+    local toolBackground = Instance.new("Frame")
+    toolBackground.Name = "ToolBackground"
+    toolBackground.Size = UDim2.new(1, 0, 0, 20)
+    toolBackground.Position = UDim2.new(0, 0, 0, 60)
+    toolBackground.BackgroundColor3 = Color3.new(0, 0, 0)
+    toolBackground.BackgroundTransparency = 0.5
+    toolBackground.Parent = toolFrame
+    
+    local toolCorner = Instance.new("UICorner")
+    toolCorner.CornerRadius = UDim.new(0, 4)
+    toolCorner.Parent = toolBackground
+    
+    local toolName = Instance.new("TextLabel")
+    toolName.Name = "ToolName"
+    toolName.Size = UDim2.new(1, 0, 1, 0)
+    toolName.BackgroundTransparency = 1
+    toolName.TextColor3 = Color3.new(1, 1, 1)
+    toolName.TextStrokeTransparency = 0.5
+    toolName.TextStrokeColor3 = Color3.new(0, 0, 0)
+    toolName.Font = Enum.Font.GothamBold
+    toolName.TextSize = 14
+    toolName.Text = ""
+    toolName.Parent = toolBackground
+    
+    -- Store connections for cleanup
+    local connections = {}
+    
+    -- Adjust billboard height based on character
+    local function updateBillboardPosition()
+        if not character or not character:IsDescendantOf(workspace) then return end
+        
+        local primaryPart = character.PrimaryPart or character:FindFirstChildOfClass("Part")
+        if not primaryPart then return end
+        
+        billboardGui.Adornee = primaryPart
+        
+        -- Try to get character height
+        local height = 5 -- Default height
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            height = humanoid.HipHeight * 2 + 2
+        else
+            -- Try to calculate from character parts
+            local minY, maxY = math.huge, -math.huge
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local partPos = part.Position
+                    local partSize = part.Size
+                    minY = math.min(minY, partPos.Y - partSize.Y/2)
+                    maxY = math.max(maxY, partPos.Y + partSize.Y/2)
+                end
+            end
+            if minY ~= math.huge and maxY ~= -math.huge then
+                height = maxY - minY
+            end
+        end
+        
+        billboardGui.StudsOffset = Vector3.new(0, height * 0.7, 0)
+    end
+    
+    -- Update position immediately and set up connections
+    updateBillboardPosition()
+    
+    -- Track changes to character that might affect billboard position
+    table.insert(connections, character.ChildAdded:Connect(function()
+        task.wait(0.1)
+        updateBillboardPosition()
+    end))
+    
+    table.insert(connections, character.DescendantAdded:Connect(function()
+        task.wait(0.1)
+        updateBillboardPosition()
+    end))
+    
+    -- Also update when character moves (for invisible characters)
+    local primaryPart = character.PrimaryPart or character:FindFirstChildOfClass("Part")
+    if primaryPart then
+        table.insert(connections, RunService.Heartbeat:Connect(function()
+            if not espScannerEnabled then return end
+            if not character or not character:IsDescendantOf(workspace) then return end
+            if not primaryPart or not primaryPart:IsDescendantOf(character) then return end
+            
+            -- Update highlight adornee periodically to handle invisibility changes
+            highlight.Adornee = character
+            
+            -- Only update position occasionally to save performance
+            if tick() % 0.5 < 0.1 then
+                updateBillboardPosition()
+            end
+        end))
+    end
+    
+    espBillboards[player.UserId] = {
+        billboard = billboardGui,
+        imageLabel = toolImage,
+        nameLabel = toolName,
+        connections = connections
+    }
+end
+
+-- Function to update tool display
+local function updateToolDisplay(player)
+    if not espScannerEnabled then return end
+    if not espBillboards[player.UserId] then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local tool = character:FindFirstChildOfClass("Tool")
+    
+    local toolDisplay = espBillboards[player.UserId]
+    if tool then
+        local textureId = getToolTextureId(tool)
+        if textureId then
+            toolDisplay.imageLabel.Image = textureId
+            toolDisplay.imageLabel.Visible = true
+        else
+            toolDisplay.imageLabel.Visible = false
+        end
+        
+        toolDisplay.nameLabel.Text = tool.Name
+        toolDisplay.nameLabel.Parent.Visible = true
+    else
+        -- No tool equipped
+        toolDisplay.imageLabel.Image = ""
+        toolDisplay.imageLabel.Visible = false
+        toolDisplay.nameLabel.Text = ""
+        toolDisplay.nameLabel.Parent.Visible = false
+    end
+end
+
+-- Function to handle character added
+local function onCharacterAdded(player, character)
+    if espScannerEnabled and player ~= LocalPlayer then
+        task.wait(0.5) -- Wait for character to fully load
+        if espScannerEnabled then -- Check again in case it was disabled during wait
+            createESP(player, character)
+        end
+    end
+end
+
+-- Comprehensive cleanup of all ESP elements
+local function cleanupAllESP()
+    -- Disconnect all connections
+    if espUpdateConnection then
+        espUpdateConnection:Disconnect()
+        espUpdateConnection = nil
+    end
+    
+    if espPlayerAddedConnection then
+        espPlayerAddedConnection:Disconnect()
+        espPlayerAddedConnection = nil
+    end
+    
+    if espPlayerRemovingConnection then
+        espPlayerRemovingConnection:Disconnect()
+        espPlayerRemovingConnection = nil
+    end
+    
+    -- Clean up all character connections
+    for userId, connection in pairs(espCharacterAddedConnections) do
+        if typeof(connection) == "RBXScriptConnection" and connection.Connected then
+            connection:Disconnect()
+        end
+        espCharacterAddedConnections[userId] = nil
+    end
+    
+    -- Clean up all highlights
+    for userId in pairs(espHighlights) do
+        cleanupESP(userId)
+    end
+    
+    -- Clean up all billboards
+    for userId in pairs(espBillboards) do
+        cleanupESP(userId)
+    end
+    
+    -- Final check for any remaining ESP elements in the workspace
+    for _, obj in pairs(workspace.CurrentCamera:GetChildren()) do
+        if obj.Name:match("^ESPHighlight_") or obj.Name:match("^ESPToolDisplay_") then
+            obj:Destroy()
+        end
+    end
+end
+
+-- Function to start ESP scanner
+local function startESPScanner()
+    if espUpdateConnection then return end
+    
+    -- Create ESP for existing players
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            createESP(player, player.Character)
+        end
+    end
+    
+    -- Set up connections for new players
+    espPlayerAddedConnection = Players.PlayerAdded:Connect(function(player)
+        if player == LocalPlayer then return end
+        
+        espCharacterAddedConnections[player.UserId] = player.CharacterAdded:Connect(function(character)
+            onCharacterAdded(player, character)
+        end)
+        
+        if player.Character then
+            onCharacterAdded(player, player.Character)
+        end
+    end)
+    
+    espPlayerRemovingConnection = Players.PlayerRemoving:Connect(function(player)
+        cleanupESP(player.UserId)
+    end)
+    
+    -- Connect to CharacterAdded for existing players
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            espCharacterAddedConnections[player.UserId] = player.CharacterAdded:Connect(function(character)
+                onCharacterAdded(player, character)
+            end)
+            
+            if player.Character then
+                player.Character.AncestryChanged:Connect(function(_, parent)
+                    if not parent and espScannerEnabled then
+                        cleanupESP(player.UserId)
+                        
+                        -- Re-create ESP when character respawns
+                        task.wait(1)
+                        if player.Character and espScannerEnabled then
+                            createESP(player, player.Character)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+    
+    -- Update loop for rainbow effect and tool display
+    espUpdateConnection = RunService.RenderStepped:Connect(function()
+        if not espScannerEnabled then return end
+        
+        local rainbowColor = updateRainbowHighlights()
+        
+        -- Update highlights and tool displays
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local userId = player.UserId
+                
+                -- Check if player still exists
+                if not player:IsDescendantOf(game) then
+                    cleanupESP(userId)
+                    continue
+                end
+                
+                if player.Character then
+                    -- Create ESP if it doesn't exist
+                    if not espHighlights[userId] or not espHighlights[userId].Parent then
+                        createESP(player, player.Character)
+                    end
+                    
+                    -- Update highlight color
+                    if espHighlights[userId] then
+                        espHighlights[userId].FillColor = rainbowColor
+                        
+                        -- Ensure highlight is working for invisible characters
+                        if espHighlights[userId].Adornee ~= player.Character then
+                            espHighlights[userId].Adornee = player.Character
+                        end
+                    end
+                    
+                    -- Update tool display
+                    updateToolDisplay(player)
+                end
+            end
+        end
+    end)
+end
+
+-- Function to stop ESP scanner
+local function stopESPScanner()
+    espScannerEnabled = false
+    
+    -- Thorough cleanup of all ESP elements
+    cleanupAllESP()
+end
+
+-- Create the ESP Scanner button in the player scroll frame
+local espScannerButton = createStylishButton("EspScannerButton", "ESP SCANNER", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 0),
+    buttonColor,
+    playerScrollFrame)
+espScannerButton.LayoutOrder = 3 -- Third button
+
+-- Connect button click event
+espScannerButton.Detector.MouseButton1Click:Connect(function()
+    espScannerEnabled = not espScannerEnabled
+    
+    if espScannerEnabled then
+        espScannerButton.ButtonText.Text = "DISABLE"
+        espScannerButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        startESPScanner()
+        
+    else
+        espScannerButton.ButtonText.Text = "ESP SCANNER"
+        espScannerButton.BackgroundColor3 = buttonColor
+        stopESPScanner()
+        
+    end
+    
+    createClickEffect(espScannerButton)
+end)
+
+-- Set up button effects
+setupButtonEffects(espScannerButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Create the Server Statistic button in the player scroll frame
+local serverStatButton = createStylishButton("ServerStatButton", "SERVER STATISTIC", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 130),
+    buttonColor,
+    playerScrollFrame)
+serverStatButton.LayoutOrder = 4 -- Fourth button
+
+-- Set up button effects
+setupButtonEffects(serverStatButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Create stats UI elements
+local statsFrame = Instance.new("Frame")
+statsFrame.Name = "StatsFrame"
+statsFrame.Size = UDim2.new(0, 300, 0, 200)
+statsFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+statsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+statsFrame.BorderSizePixel = 0
+statsFrame.Visible = false
+statsFrame.Parent = gui
+
+-- Rounded corners for stats frame
+local statsCorner = Instance.new("UICorner")
+statsCorner.CornerRadius = UDim.new(0, 12)
+statsCorner.Parent = statsFrame
+
+-- Gradient background for stats frame
+local statsGradient = Instance.new("UIGradient")
+statsGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
+}
+statsGradient.Rotation = 45
+statsGradient.Parent = statsFrame
+
+-- Title bar for stats
+local statsTitleBar = Instance.new("Frame")
+statsTitleBar.Name = "TitleBar"
+statsTitleBar.Size = UDim2.new(1, 0, 0, 30)
+statsTitleBar.BackgroundTransparency = 1
+statsTitleBar.Parent = statsFrame
+
+local statsTitle = Instance.new("TextLabel")
+statsTitle.Name = "Title"
+statsTitle.Size = UDim2.new(1, -20, 1, 0)
+statsTitle.Position = UDim2.new(0, 10, 0, 0)
+statsTitle.BackgroundTransparency = 1
+statsTitle.Font = Enum.Font.GothamBold
+statsTitle.Text = "SERVER STATISTICS"
+statsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+statsTitle.TextSize = 14
+statsTitle.TextXAlignment = Enum.TextXAlignment.Left
+statsTitle.Parent = statsTitleBar
+
+-- Divider
+local statsDivider = Instance.new("Frame")
+statsDivider.Name = "Divider"
+statsDivider.Size = UDim2.new(1, -20, 0, 1)
+statsDivider.Position = UDim2.new(0, 10, 0, 35)
+statsDivider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+statsDivider.BorderSizePixel = 0
+statsDivider.Transparency = 0.7
+statsDivider.Parent = statsFrame
+
+-- Create scrolling frame for stats
+local statsScrollFrame = Instance.new("ScrollingFrame")
+statsScrollFrame.Name = "StatsScrollFrame"
+statsScrollFrame.Size = UDim2.new(1, -20, 1, -45)
+statsScrollFrame.Position = UDim2.new(0, 10, 0, 40)
+statsScrollFrame.BackgroundTransparency = 1
+statsScrollFrame.BorderSizePixel = 0
+statsScrollFrame.ScrollBarThickness = 4
+statsScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 150)
+statsScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+statsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+statsScrollFrame.Parent = statsFrame
+
+-- Create layout for stats
+local statsLayout = Instance.new("UIListLayout")
+statsLayout.Name = "StatsLayout"
+statsLayout.Padding = UDim.new(0, 5)
+statsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+statsLayout.Parent = statsScrollFrame
+
+-- Function to create stat label
+local function createStatLabel(name, order)
+    local statLabel = Instance.new("TextLabel")
+    statLabel.Name = name .. "Stat"
+    statLabel.Size = UDim2.new(1, 0, 0, 20)
+    statLabel.BackgroundTransparency = 1
+    statLabel.Font = Enum.Font.Gotham
+    statLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+    statLabel.TextSize = 14
+    statLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statLabel.LayoutOrder = order
+    statLabel.Parent = statsScrollFrame
+    return statLabel
+end
+
+-- Create most of the stat labels
+local playerCountStat = createStatLabel("PlayerCount", 1)
+local serverUptimeStat = createStatLabel("ServerUptime", 2)
+local clientFpsStat = createStatLabel("ClientFPS", 4)
+local clientPingStat = createStatLabel("ClientPing", 5)
+local memoryUsageStat = createStatLabel("MemoryUsage", 6)
+
+-- Create server ID container with copy button
+local serverIdContainer = Instance.new("Frame")
+serverIdContainer.Name = "ServerIdContainer"
+serverIdContainer.Size = UDim2.new(1, 0, 0, 20)
+serverIdContainer.BackgroundTransparency = 1
+serverIdContainer.LayoutOrder = 3
+serverIdContainer.Parent = statsScrollFrame
+
+local serverIdLabel = Instance.new("TextLabel")
+serverIdLabel.Name = "ServerIdLabel"
+serverIdLabel.Size = UDim2.new(1, -30, 1, 0)
+serverIdLabel.BackgroundTransparency = 1
+serverIdLabel.Font = Enum.Font.Gotham
+serverIdLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+serverIdLabel.TextSize = 14
+serverIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+serverIdLabel.Parent = serverIdContainer
+
+-- Create copy button
+local copyButton = Instance.new("ImageButton")
+copyButton.Name = "CopyButton"
+copyButton.Size = UDim2.new(0, 20, 0, 20)
+copyButton.Position = UDim2.new(1, -20, 0, 0)
+copyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+copyButton.BorderSizePixel = 0
+copyButton.Parent = serverIdContainer
+
+-- Make copy button rounded
+local copyCorner = Instance.new("UICorner")
+copyCorner.CornerRadius = UDim.new(0, 4)
+copyCorner.Parent = copyButton
+
+-- Add copy icon
+local copyIcon = Instance.new("TextLabel")
+copyIcon.Name = "CopyIcon"
+copyIcon.Size = UDim2.new(1, 0, 1, 0)
+copyIcon.BackgroundTransparency = 1
+copyIcon.Font = Enum.Font.GothamBold
+copyIcon.Text = "📋"
+copyIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyIcon.TextSize = 14
+copyIcon.Parent = copyButton
+
+-- Add a separator after the stats
+local separator = Instance.new("Frame")
+separator.Name = "Separator"
+separator.Size = UDim2.new(1, 0, 0, 1)
+separator.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+separator.BorderSizePixel = 0
+separator.Transparency = 0.7
+separator.LayoutOrder = 7
+separator.Parent = statsScrollFrame
+
+-- Add a spacer
+local spacer = Instance.new("Frame")
+spacer.Name = "Spacer"
+spacer.Size = UDim2.new(1, 0, 0, 10)
+spacer.BackgroundTransparency = 1
+spacer.LayoutOrder = 8
+spacer.Parent = statsScrollFrame
+
+-- Add server joiner title
+local joinerTitle = Instance.new("TextLabel")
+joinerTitle.Name = "JoinerTitle"
+joinerTitle.Size = UDim2.new(1, 0, 0, 20)
+joinerTitle.BackgroundTransparency = 1
+joinerTitle.Font = Enum.Font.GothamBold
+joinerTitle.Text = "JOIN SPECIFIC SERVER"
+joinerTitle.TextColor3 = Color3.fromRGB(230, 230, 255)
+joinerTitle.TextSize = 14
+joinerTitle.TextXAlignment = Enum.TextXAlignment.Left
+joinerTitle.LayoutOrder = 9
+joinerTitle.Parent = statsScrollFrame
+
+-- Create server ID input
+local serverIdInput = Instance.new("Frame")
+serverIdInput.Name = "ServerIdInput"
+serverIdInput.Size = UDim2.new(1, 0, 0, 30)
+serverIdInput.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+serverIdInput.BorderSizePixel = 0
+serverIdInput.LayoutOrder = 10
+serverIdInput.Parent = statsScrollFrame
+
+-- Make input rounded
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 6)
+inputCorner.Parent = serverIdInput
+
+-- Add input border
+local inputStroke = Instance.new("UIStroke")
+inputStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+inputStroke.Color = Color3.fromRGB(100, 100, 150)
+inputStroke.Thickness = 1
+inputStroke.Transparency = 0.7
+inputStroke.Parent = serverIdInput
+
+-- Create the actual textbox
+local textbox = Instance.new("TextBox")
+textbox.Name = "ServerIdTextbox"
+textbox.Size = UDim2.new(1, -16, 1, 0)
+textbox.Position = UDim2.new(0, 8, 0, 0)
+textbox.BackgroundTransparency = 1
+textbox.Font = Enum.Font.Gotham
+textbox.PlaceholderText = "Enter server ID to join..."
+textbox.PlaceholderColor3 = Color3.fromRGB(150, 150, 200)
+textbox.Text = ""
+textbox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textbox.TextSize = 14
+textbox.TextXAlignment = Enum.TextXAlignment.Left
+textbox.ClearTextOnFocus = false
+textbox.Parent = serverIdInput
+
+-- Add Join Server button
+local joinButton = Instance.new("Frame")
+joinButton.Name = "JoinButton"
+joinButton.Size = UDim2.new(1, 0, 0, 35)
+joinButton.Position = UDim2.new(0, 0, 0, 0)
+joinButton.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+joinButton.BorderSizePixel = 0
+joinButton.LayoutOrder = 11
+joinButton.Parent = statsScrollFrame
+
+-- Make button rounded
+local joinCorner = Instance.new("UICorner")
+joinCorner.CornerRadius = UDim.new(0, 6)
+joinCorner.Parent = joinButton
+
+-- Add button gradient
+local joinGradient = Instance.new("UIGradient")
+joinGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 70)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 50))
+}
+joinGradient.Rotation = 90
+joinGradient.Parent = joinButton
+
+-- Add button text
+local joinText = Instance.new("TextLabel")
+joinText.Name = "JoinButtonText"
+joinText.Size = UDim2.new(1, 0, 1, 0)
+joinText.BackgroundTransparency = 1
+joinText.Font = Enum.Font.GothamBold
+joinText.Text = "JOIN SERVER"
+joinText.TextColor3 = Color3.fromRGB(255, 255, 255)
+joinText.TextSize = 14
+joinText.Parent = joinButton
+
+-- Add button detector
+local joinDetector = Instance.new("TextButton")
+joinDetector.Name = "Detector"
+joinDetector.Size = UDim2.new(1, 0, 1, 0)
+joinDetector.BackgroundTransparency = 1
+joinDetector.Text = ""
+joinDetector.Parent = joinButton
+
+-- Variables for stats tracking
+local statsVisible = false
+local statsUpdateConnection = nil
+local serverStartTime = tick()
+
+-- Better FPS tracking system using frame counting
+local fpsCounter = 0
+local lastFpsCheck = tick()
+local currentFps = 0
+
+-- Function to update stats with error handling
+local function updateStats()
+    pcall(function()
+        -- Player count
+        playerCountStat.Text = "Players: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers
+        
+        -- Server uptime
+        local uptime = tick() - serverStartTime
+        local hours = math.floor(uptime / 3600)
+        local minutes = math.floor((uptime % 3600) / 60)
+        local seconds = math.floor(uptime % 60)
+        serverUptimeStat.Text = "Uptime: " .. string.format("%02d:%02d:%02d", hours, minutes, seconds)
+        
+        -- Server ID
+        serverIdLabel.Text = "Server ID: " .. game.JobId
+        
+        -- Client FPS (from the frame counter)
+        clientFpsStat.Text = "FPS: " .. currentFps
+        
+        -- Client ping with error handling
+        local ping = 0
+        pcall(function()
+            ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        clientPingStat.Text = "Ping: " .. ping .. "ms"
+        
+        -- Memory usage with error handling
+        local memoryMB = 0
+        pcall(function()
+            memoryMB = math.floor(game:GetService("Stats"):GetTotalMemoryUsageMb())
+        end)
+        memoryUsageStat.Text = "Memory: " .. memoryMB .. " MB"
+        
+        -- Update canvas size safely
+        if statsLayout and statsScrollFrame then
+            statsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, statsLayout.AbsoluteContentSize.Y + 20)
+        end
+    end)
+end
+
+-- Function to toggle stats display
+local function toggleServerStats()
+    statsVisible = not statsVisible
+    statsFrame.Visible = statsVisible
+    
+    if statsVisible then
+        -- Update stats immediately
+        updateStats()
+        
+        -- Clean up existing connection
+        if statsUpdateConnection then
+            pcall(function() 
+                statsUpdateConnection:Disconnect() 
+                statsUpdateConnection = nil
+            end)
+        end
+        
+        -- Reset FPS counter
+        fpsCounter = 0
+        lastFpsCheck = tick()
+        currentFps = 0
+        
+        -- Set up regular updates with safe heartbeat connection
+        statsUpdateConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            -- Count frames for FPS calculation
+            fpsCounter = fpsCounter + 1
+            
+            -- Every second, calculate the FPS
+            local now = tick()
+            if now - lastFpsCheck >= 1 then
+                currentFps = fpsCounter
+                fpsCounter = 0
+                lastFpsCheck = now
+                
+                -- Update all stats once per second
+                updateStats()
+            end
+        end)
+        
+        
+    else
+        -- Stop updating when not visible
+        if statsUpdateConnection then
+            pcall(function() 
+                statsUpdateConnection:Disconnect() 
+                statsUpdateConnection = nil
+            end)
+        end
+    end
+end
+
+-- Function to copy text to clipboard
+local function copyToClipboard(text)
+    local clipboard = setclipboard or toclipboard or set_clipboard or Clipboard and Clipboard.set
+    
+    if clipboard then
+        clipboard(text)
+        return true
+    else
+        return false
+    end
+end
+
+-- Connect copy button
+copyButton.MouseButton1Click:Connect(function()
+    local serverId = game.JobId
+    local success = copyToClipboard(serverId)
+    
+    if success then
+        showNotification("Copied", "Server ID copied to clipboard", "success", 1.5)
+    else
+        showNotification("Cannot Copy", "Your exploit doesn support clipboard", "error", 1.5)
+    end
+end)
+
+-- Function to join a specific server
+local function joinServer(serverId)
+    if serverId == "" then
+        showNotification("Error", "Please enter a server ID", "error", 2)
+        return
+    end
+    
+    -- Check if server ID is valid format (simple check)
+    if not serverId:match("^[a-zA-Z0-9%-]+$") then
+        showNotification("Error", "Invalid server formaT ID", "error", 2)
+        return
+    end
+    
+    -- Try to teleport
+    local teleportService = game:GetService("TeleportService")
+    
+    -- Show teleporting notification
+    showNotification("Teleporting", "Joining server...", "info", 2)
+    
+    -- Attempt to teleport
+    local success, err = pcall(function()
+        teleportService:TeleportToPlaceInstance(game.PlaceId, serverId, LocalPlayer)
+    end)
+    
+    -- Handle teleport failure
+    if not success then
+        showNotification("Error", "Failed to join server", "error", 2)
+    end
+end
+
+-- Connect join button
+joinDetector.MouseButton1Click:Connect(function()
+    createClickEffect(joinButton)
+    local serverId = textbox.Text
+    joinServer(serverId)
+end)
+
+-- Setup button hover effects for join button
+joinDetector.MouseEnter:Connect(function()
+    local tween = TweenService:Create(
+        joinButton,
+        TweenInfo.new(0.2),
+        {BackgroundColor3 = Color3.fromRGB(60, 60, 100)}
+    )
+    tween:Play()
+end)
+
+joinDetector.MouseLeave:Connect(function()
+    local tween = TweenService:Create(
+        joinButton,
+        TweenInfo.new(0.2),
+        {BackgroundColor3 = Color3.fromRGB(40, 40, 70)}
+    )
+    tween:Play()
+end)
+
+-- Make stats frame draggable
+local statsIsDragging = false
+local statsDragStart = nil
+local statsStartPos = nil
+
+statsTitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        statsIsDragging = true
+        statsDragStart = input.Position
+        statsStartPos = statsFrame.Position
+    end
+end)
+
+statsTitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        statsIsDragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if statsIsDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - statsDragStart
+        statsFrame.Position = UDim2.new(
+            statsStartPos.X.Scale,
+            statsStartPos.X.Offset + delta.X,
+            statsStartPos.Y.Scale,
+            statsStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Connect server stat button
+serverStatButton.Detector.MouseButton1Click:Connect(function()
+    toggleServerStats()
+    createClickEffect(serverStatButton)
+end)
+
+-- Create the STEAL button in the player scroll frame
+local stealLaserButton = createStylishButton("StealLaserButton", "STEAL", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 190),
+    buttonColor,
+    playerScrollFrame)
+stealLaserButton.LayoutOrder = 5 -- Fifth button
+
+-- Set up button effects
+setupButtonEffects(stealLaserButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Variables for the steal functionality
+local isStealRunning = false
+local stealConnection = nil
+local laserWatchConnection = nil
+
+-- Function to find the base the player is standing on
+local function findNearestBase()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        showNotification("Error", "Character not found", "error", 2)
+        return nil
+    end
+
+    local rootPart = character.HumanoidRootPart
+    local characterPosition = rootPart.Position
+    
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then
+        showNotification("Error", "No plots found in workspace", "error", 2)
+        return nil
+    end
+    
+    local nearestPlot = nil
+    local nearestDistance = 50 -- Maximum detection distance
+    
+    -- Check all plots
+    for _, plot in pairs(plots:GetChildren()) do
+        -- Look for any Part with exact dimensions
+        for _, part in pairs(plot:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name == "Part" then
+                local size = part.Size
+                -- Check if it's the main floor part with exact dimensions
+                if size == Vector3.new(45, 2, 16) then
+                    local distance = (part.Position - characterPosition).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestPlot = plot
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearestPlot
+end
+
+-- Function to find the laser hitbox in a plot
+local function findLaserHitbox(plot)
+    local laserHitbox = plot:FindFirstChild("LaserHitbox")
+    if laserHitbox then
+        local main = laserHitbox:FindFirstChild("Main")
+        if main and main:IsA("BasePart") then
+            return main
+        end
+    end
+    
+    showNotification("Error", "Laser hitbox not found", "error", 2)
+    return nil
+end
+
+-- Function to get the outside direction of the laser hitbox
+local function getOutsideDirection(laserHitbox, plotCenter)
+    -- Calculate direction away from the plot center
+    local directionFromCenter = (laserHitbox.Position - plotCenter).Unit
+    
+    -- If direction can't be determined, use the negative of laser's look vector
+    if directionFromCenter.Magnitude < 0.1 then
+        return -laserHitbox.CFrame.LookVector
+    end
+    
+    return directionFromCenter
+end
+
+-- Function to tween to a position with constant speed
+local function tweenToPositionWithSpeed(targetPosition, speed)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local rootPart = character.HumanoidRootPart
+    
+    -- Calculate distance to target
+    local distance = (targetPosition - rootPart.Position).Magnitude
+    
+    -- Calculate duration based on constant speed
+    local duration = distance / speed
+    
+    -- Create tween
+    local tweenInfo = TweenInfo.new(
+        duration,
+        Enum.EasingStyle.Linear, -- Linear for constant speed
+        Enum.EasingDirection.Out
+    )
+    
+    local tween = TweenService:Create(rootPart, tweenInfo, {
+        CFrame = CFrame.new(targetPosition)
+    })
+    
+    -- Play tween
+    tween:Play()
+    
+    -- Wait for tween to complete
+    local tweenComplete = false
+    tween.Completed:Connect(function()
+        tweenComplete = true
+    end)
+    
+    -- Wait with timeout
+    local startTime = tick()
+    while not tweenComplete do
+        if tick() - startTime > duration + 2 then -- Timeout
+            return false
+        end
+        task.wait()
+    end
+    
+    return true
+end
+
+-- Function to anchor character
+local function anchorCharacter(character, shouldAnchor)
+    if not character then return end
+    
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = shouldAnchor
+        end
+    end
+end
+
+-- Function to run the steal sequence
+local function runSteal()
+    if isStealRunning then return end
+    
+    isStealRunning = true
+    stealLaserButton.ButtonText.Text = "STEALING..."
+    stealLaserButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+    
+    task.spawn(function()
+        -- Find the nearest base
+        local nearestPlot = findNearestBase()
+        if not nearestPlot then
+            showNotification("Error", "No nearby plot found", "error", 2)
+            isStealRunning = false
+            stealLaserButton.ButtonText.Text = "STEAL"
+            stealLaserButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+                
+        -- Find the laser hitbox
+        local laserHitbox = findLaserHitbox(nearestPlot)
+        if not laserHitbox then
+            isStealRunning = false
+            stealLaserButton.ButtonText.Text = "STEAL"
+            stealLaserButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        local character = LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            isStealRunning = false
+            stealLaserButton.ButtonText.Text = "STEAL"
+            stealLaserButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- Get plot center for direction calculation
+        local plotCenter = Vector3.new(0, 0, 0)
+        local partCount = 0
+        
+        for _, part in pairs(nearestPlot:GetDescendants()) do
+            if part:IsA("BasePart") then
+                plotCenter = plotCenter + part.Position
+                partCount = partCount + 1
+            end
+        end
+        
+        if partCount > 0 then
+            plotCenter = plotCenter / partCount
+        else
+            plotCenter = character.HumanoidRootPart.Position
+        end
+        
+        -- Calculate outside direction
+        local outsideDirection = getOutsideDirection(laserHitbox, plotCenter)
+        
+        
+        -- 
+        local targetPosition = laserHitbox.Position + (outsideDirection * 3)
+        
+                
+        -- FIRST: Tween to position outside of laser at 40 studs/sec
+        local success = tweenToPositionWithSpeed(targetPosition, 40)
+        
+        if not success or not isStealRunning then
+            isStealRunning = false
+            stealLaserButton.ButtonText.Text = "STEAL"
+            stealLaserButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- SECOND: After tween completes, anchor the character
+        anchorCharacter(character, true)
+        
+        -- Wait for LaserHitbox to become non-collidable
+        local laserOpened = false
+        
+        -- Clean up any existing connection
+        if laserWatchConnection then
+            laserWatchConnection:Disconnect()
+            laserWatchConnection = nil
+        end
+        
+        -- Set up a new connection to watch for CanCollide change
+        laserWatchConnection = RunService.Heartbeat:Connect(function()
+            if not isStealRunning then return end
+            
+            if laserHitbox and not laserHitbox.CanCollide then
+                laserOpened = true
+                
+                if laserWatchConnection then
+                    laserWatchConnection:Disconnect()
+                    laserWatchConnection = nil
+                end
+            end
+        end)
+        
+        -- Wait for laser to open with timeout
+        local startWaitTime = tick()
+            
+        while not laserOpened and isStealRunning do
+            if tick() - startWaitTime > 30 then -- 30 second timeout
+                showNotification("Timeout", "Используй только при меньше 30 секунд до открытия базы", "error", 2)
+                
+                if laserWatchConnection then
+                    laserWatchConnection:Disconnect()
+                    laserWatchConnection = nil
+                end
+                
+                anchorCharacter(character, false)
+                isStealRunning = false
+                stealLaserButton.ButtonText.Text = "STEAL"
+                stealLaserButton.BackgroundColor3 = buttonColor
+                return
+            end
+            task.wait(0.1)
+        end
+        
+        -- If we've stopped the process during the wait
+        if not isStealRunning then
+            anchorCharacter(character, false)
+            stealLaserButton.ButtonText.Text = "STEAL"
+            stealLaserButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- THIRD: Laser is open, unanchor first
+        showNotification("Laser status", "Getting out...", "success", 1.5)
+        anchorCharacter(character, false)
+        
+        -- FOURTH: Calculate position 10 studs further outside
+        local escapePosition = targetPosition + (outsideDirection * 10)
+        
+        -- Tween to escape position
+        tweenToPositionWithSpeed(escapePosition, 40)
+        
+        -- FIFTH: Teleport up 200 studs
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            -- Calculate position 200 studs above current position
+            local upPosition = rootPart.Position + Vector3.new(0, 200, 0)
+            
+            -- Teleport up instantly
+            rootPart.CFrame = CFrame.new(upPosition)
+        end
+        
+        -- Complete
+        showNotification("Success", "Completed", "success", 2)
+        isStealRunning = false
+        stealLaserButton.ButtonText.Text = "STEAL"
+        stealLaserButton.BackgroundColor3 = buttonColor
+    end)
+end
+
+-- Function to stop the steal process
+local function stopSteal()
+    if not isStealRunning then return end
+    
+    isStealRunning = false
+    
+    -- Clean up laser watch connection
+    if laserWatchConnection then
+        laserWatchConnection:Disconnect()
+        laserWatchConnection = nil
+    end
+    
+    -- Unanchor character
+    local character = LocalPlayer.Character
+    if character then
+        anchorCharacter(character, false)
+    end
+    
+    stealLaserButton.ButtonText.Text = "STEAL"
+    stealLaserButton.BackgroundColor3 = buttonColor
+    
+    showNotification("Stopped", "Steal process cancelled", "warning", 0.5)
+end
+
+-- Connect steal button
+stealLaserButton.Detector.MouseButton1Click:Connect(function()
+    if isStealRunning then
+        stopSteal()
+    else
+        runSteal()
+    end
+    createClickEffect(stealLaserButton)
+end)
+
+
+
+
+-- Create the Boost button in the player scroll frame
+local boostButton = createStylishButton("BoostButton", "BOOST", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 250), -- Position after other buttons
+    buttonColor,
+    playerScrollFrame)
+boostButton.LayoutOrder = 6 -- Sixth button
+
+-- Set up button effects
+setupButtonEffects(boostButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Variables for boost functionality
+local boostEnabled = false
+local boostConnection = nil
+local boosting = false
+
+-- Function to start boost
+local function startBoost()
+    if boostConnection then return end
+    
+    boostConnection = RunService.Heartbeat:Connect(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        if (LocalPlayer.Backpack:FindFirstChild("Invisibility Cloak") == nil and LocalPlayer.Character:FindFirstChild("Invisibility Cloak") == nil) then
+              
+              showNotification("Boost", "Please buy invisibility cloak :C", "error", 1)
+    
+              boostConnection:Disconnect()
+              boostConnection = nil
+        end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        local head = character:FindFirstChild("Head")
+        
+        if not humanoid or not rootPart or not head then return end
+        
+        -- Check head transparency - pause boost if head is invisible
+        if head.Transparency == 1 then
+            boosting = false
+        else
+            boosting = true
+        end
+        
+        -- Only apply boost if not paused
+        if boosting then
+            -- Get movement direction and calculate boosted velocity
+            local moveDirection = humanoid.MoveDirection
+            
+            if moveDirection.Magnitude > 0 then
+                -- Calculate normal velocity from walkspeed
+                local normalVelocity = moveDirection * humanoid.WalkSpeed
+                
+                -- Apply 2.5x boost (only X and Z components)
+                local boostedVelocity = Vector3.new(
+                    normalVelocity.X * 2.5, -- Increased from 2x to 2.5x
+                    rootPart.AssemblyLinearVelocity.Y, -- Preserve Y velocity for jumping
+                    normalVelocity.Z * 2.5  -- Increased from 2x to 2.5x
+                )
+                
+                -- Apply the boosted velocity
+                rootPart.AssemblyLinearVelocity = boostedVelocity
+            end
+        end
+    end)
+end
+
+-- Function to stop boost
+local function stopBoost()
+    if boostConnection then
+        boostConnection:Disconnect()
+        boostConnection = nil
+    end
+    boosting = false
+end
+
+-- Connect boost button
+boostButton.Detector.MouseButton1Click:Connect(function()
+    boostEnabled = not boostEnabled
+    
+    if boostEnabled then
+        boostButton.ButtonText.Text = "DISABLE"
+        boostButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        startBoost()
+    else
+        boostButton.ButtonText.Text = "BOOST"
+        boostButton.BackgroundColor3 = buttonColor
+        stopBoost()
+    end
+    
+    createClickEffect(boostButton)
+end)
+
+-- Clean up on script end
+Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        stopBoost()
+    end
+end)
+
+-- Create the Boost Jump button in the player scroll frame
+local boostJumpButton = createStylishButton("BoostJumpButton", "BOOST JUMP", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 310), -- Position after other buttons
+    buttonColor,
+    playerScrollFrame)
+boostJumpButton.LayoutOrder = 7 -- Seventh button
+
+-- Set up button effects
+setupButtonEffects(boostJumpButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Variables for boost jump functionality
+local jumpBoostEnabled = false
+local originalJumpPower = 50 -- Default value if we can't get the current value
+
+-- Function to start jump boost
+local function startJumpBoost()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    -- Try to enable UseJumpPower
+    pcall(function()
+        humanoid.UseJumpPower = true
+    end)
+    
+    -- Store original value
+    originalJumpPower = humanoid.JumpPower
+    
+    -- Set boosted jump power
+    humanoid.JumpPower = 120
+end
+
+-- Function to stop jump boost
+local function stopJumpBoost()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    -- Restore original value
+    humanoid.JumpPower = originalJumpPower
+end
+
+-- Character added handler for persistent boost
+local function onCharacterAdded(newCharacter)
+    if jumpBoostEnabled then
+        -- Wait for humanoid to be added
+        local humanoid = newCharacter:WaitForChild("Humanoid", 2)
+        if humanoid then
+            -- Try to enable UseJumpPower
+            pcall(function()
+                humanoid.UseJumpPower = true
+            end)
+            
+            -- Apply jump boost to new character
+            humanoid.JumpPower = 120
+        end
+    end
+end
+
+-- Connect character added event
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- Connect boost jump button
+boostJumpButton.Detector.MouseButton1Click:Connect(function()
+    jumpBoostEnabled = not jumpBoostEnabled
+    
+    if jumpBoostEnabled then
+        boostJumpButton.ButtonText.Text = "DISABLE"
+        boostJumpButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        startJumpBoost()
+    else
+        boostJumpButton.ButtonText.Text = "BOOST JUMP"
+        boostJumpButton.BackgroundColor3 = buttonColor
+        stopJumpBoost()
+    end
+    
+    createClickEffect(boostJumpButton)
+end)
+
+-- Clean up on script end
+Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer and jumpBoostEnabled then
+        stopJumpBoost()
+    end
+end)
+
+-- Create the TEST STEAL button in the player scroll frame
+local testStealButton = createStylishButton("TestStealButton", "TEST STEAL", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 370), -- Position after other buttons
+    buttonColor,
+    playerScrollFrame)
+testStealButton.LayoutOrder = 8 -- Eighth button
+
+-- Set up button effects
+setupButtonEffects(testStealButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Variables for the test steal functionality
+local isTestStealRunning = false
+local testStealConnection = nil
+local testLaserWatchConnection = nil
+local tweenConnection = nil
+
+-- Function to tween to a position with constant speed
+local function tweenToPositionWithSpeed2(targetPosition, speed)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local rootPart = character.HumanoidRootPart
+    
+    -- Calculate distance to target
+    local distance = (targetPosition - rootPart.Position).Magnitude
+    
+    -- Calculate duration based on constant speed
+    local duration = distance / speed
+    
+    -- Create tween
+    local tweenInfo = TweenInfo.new(
+        duration,
+        Enum.EasingStyle.Linear, -- Linear for constant speed
+        Enum.EasingDirection.Out
+    )
+    
+    local tween = TweenService:Create(
+        rootPart,
+        tweenInfo,
+        {CFrame = CFrame.new(targetPosition)}
+    )
+    
+    -- Play tween
+    tween:Play()
+    
+    -- Wait for tween to complete
+    local tweenComplete = false
+    tween.Completed:Connect(function()
+        tweenComplete = true
+    end)
+    
+    -- Wait with timeout
+    local startTime = tick()
+    while not tweenComplete do
+        if tick() - startTime > duration + 2 then -- Timeout
+            return false
+        end
+        task.wait()
+    end
+    
+    return true
+end
+
+-- Function to run the test steal sequence
+local function runTestSteal()
+    if isTestStealRunning then return end
+    
+    isTestStealRunning = true
+    testStealButton.ButtonText.Text = "STEALING..."
+    testStealButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+    
+    task.spawn(function()
+        -- Find the nearest base
+        local nearestPlot = findNearestBase()
+        if not nearestPlot then
+            isTestStealRunning = false
+            testStealButton.ButtonText.Text = "TEST STEAL"
+            testStealButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- Find the laser hitbox
+        local laserHitbox = findLaserHitbox(nearestPlot)
+        if not laserHitbox then
+            isTestStealRunning = false
+            testStealButton.ButtonText.Text = "TEST STEAL"
+            testStealButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        local character = LocalPlayer.Character
+        if not character then
+            isTestStealRunning = false
+            testStealButton.ButtonText.Text = "TEST STEAL"
+            testStealButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- Get plot center for direction calculation
+        local plotCenter = Vector3.new(0, 0, 0)
+        local partCount = 0
+        
+        for _, part in pairs(nearestPlot:GetDescendants()) do
+            if part:IsA("BasePart") then
+                plotCenter = plotCenter + part.Position
+                partCount = partCount + 1
+            end
+        end
+        
+        if partCount > 0 then
+            plotCenter = plotCenter / partCount
+        else
+            plotCenter = character.HumanoidRootPart.Position
+        end
+        
+        -- Calculate outside direction
+        local outsideDirection = getOutsideDirection(laserHitbox, plotCenter)
+        
+        -- Calculate position 10 studs in front of laser hitbox and add 5 studs in X
+        local targetPosition = laserHitbox.Position + (outsideDirection * 10) + Vector3.new(5, 0, 0)
+        
+        -- FIRST: Continuously tween to target position until laser disappears
+        local laserOpened = false
+        
+        -- Set up a connection to watch for CanCollide change
+        testLaserWatchConnection = RunService.Heartbeat:Connect(function()
+            if not isTestStealRunning then return end
+            
+            if laserHitbox and not laserHitbox.CanCollide then
+                laserOpened = true
+                
+                if testLaserWatchConnection then
+                    testLaserWatchConnection:Disconnect()
+                    testLaserWatchConnection = nil
+                end
+            end
+        end)
+        
+        -- Continuously attempt to tween to the target position
+        local startWaitTime = tick()
+        
+        while not laserOpened and isTestStealRunning do
+            if tick() - startWaitTime > 30 then -- 30 second timeout
+                if testLaserWatchConnection then
+                    testLaserWatchConnection:Disconnect()
+                    testLaserWatchConnection = nil
+                end
+                
+                isTestStealRunning = false
+                testStealButton.ButtonText.Text = "TEST STEAL"
+                testStealButton.BackgroundColor3 = buttonColor
+                return
+            end
+            
+            -- Attempt to tween to target position at 50 studs/sec
+            tweenToPositionWithSpeed2(targetPosition, 50)
+            
+            -- Short wait before trying again
+            task.wait(0.1)
+        end
+        
+        -- If we've stopped the process during the wait
+        if not isTestStealRunning then
+            testStealButton.ButtonText.Text = "TEST STEAL"
+            testStealButton.BackgroundColor3 = buttonColor
+            return
+        end
+        
+        -- Laser is open, now follow the original exit logic
+        -- Calculate position 10 studs further outside
+        local escapePosition = targetPosition + (outsideDirection * 10)
+        
+        -- Tween to escape position
+        tweenToPositionWithSpeed2(escapePosition, 50)
+        
+        -- Teleport up 200 studs
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            -- Calculate position 200 studs above current position
+            local upPosition = rootPart.Position + Vector3.new(0, 200, 0)
+            
+            -- Teleport up instantly
+            rootPart.CFrame = CFrame.new(upPosition)
+        end
+        
+        -- Complete
+        isTestStealRunning = false
+        testStealButton.ButtonText.Text = "TEST STEAL"
+        testStealButton.BackgroundColor3 = buttonColor
+    end)
+end
+
+-- Function to stop the test steal process
+local function stopTestSteal()
+    if not isTestStealRunning then return end
+    
+    isTestStealRunning = false
+    
+    -- Clean up laser watch connection
+    if testLaserWatchConnection then
+        testLaserWatchConnection:Disconnect()
+        testLaserWatchConnection = nil
+    end
+    
+    testStealButton.ButtonText.Text = "TEST STEAL"
+    testStealButton.BackgroundColor3 = buttonColor
+end
+
+-- Connect test steal button
+testStealButton.Detector.MouseButton1Click:Connect(function()
+    if isTestStealRunning then
+        stopTestSteal()
+    else
+        runTestSteal()
+    end
+    createClickEffect(testStealButton)
+end)
+
+
+-- Create the FURRY VID button in the player scroll frame
+local furryVidButton = createStylishButton("FurryVidButton", "FURRY VID", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 430), -- Position after other buttons
+    buttonColor,
+    playerScrollFrame)
+furryVidButton.LayoutOrder = 9 -- Ninth button
+
+-- Set up button effects
+setupButtonEffects(furryVidButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Variables for the furry vid functionality
+local furryVidEnabled = false
+local furryVidGui = nil
+
+-- Function to create and start the video
+local function createFurryVid()
+    -- Check if the GUI already exists (shouldn't happen, but just in case)
+    if furryVidGui and furryVidGui.Parent then
+        furryVidGui:Destroy()
+    end
+    
+    -- Create the screen GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Parent = game:GetService("CoreGui")
+    screenGui.IgnoreGuiInset = true
+    screenGui.Name = "Vid1"
+    
+    -- Create the video frame
+    local videoScreen = Instance.new("VideoFrame")
+    videoScreen.Parent = screenGui
+    videoScreen.Size = UDim2.new(0.5, 0, 0.5, 0)
+    videoScreen.Position = UDim2.new(0.25, 0, 0.25, 0)
+    
+    -- Add drag detector to make it movable
+    local drag = Instance.new("UIDragDetector", videoScreen)
+    
+    -- Download and set up the video
+    pcall(function()
+        writefile("yes.mp4", game:HttpGet("https://github.com/t3rm1n4tor/leviathanScriptik/blob/main/Videos/VID_20250709_161944_976.mp4?raw=true"))
+        
+        videoScreen.BorderSizePixel = 0
+        
+        videoScreen.BackgroundTransparency = 1
+        videoScreen.Video = getcustomasset("yes.mp4")
+        videoScreen.Looped = true
+        videoScreen.Playing = true
+        videoScreen.Volume = 0
+    end)
+    
+    -- Store reference to the GUI
+    furryVidGui = screenGui
+end
+
+-- Function to disable the video
+local function disableFurryVid()
+    if furryVidGui and furryVidGui.Parent then
+        furryVidGui:Destroy() -- Completely destroy the GUI
+        furryVidGui = nil -- Clear the reference
+    end
+end
+
+-- Connect furry vid button
+furryVidButton.Detector.MouseButton1Click:Connect(function()
+    furryVidEnabled = not furryVidEnabled
+    
+    if furryVidEnabled then
+        furryVidButton.ButtonText.Text = "DISABLE"
+        furryVidButton.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        createFurryVid()
+    else
+        furryVidButton.ButtonText.Text = "FURRY VID"
+        furryVidButton.BackgroundColor3 = buttonColor
+        disableFurryVid()
+    end
+    
+    createClickEffect(furryVidButton)
+end)
+
+
+-- CAR VID
+local carVid1Button = createStylishButton("CarVid1Button", "CAR VID", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 480),
+    buttonColor,
+    playerScrollFrame)
+carVid1Button.LayoutOrder = 10
+setupButtonEffects(carVid1Button, buttonColor, Color3.fromRGB(60, 60, 100))
+
+local carVid1Enabled = false
+local carVid1Gui = nil
+
+local function createCarVid1()
+    if carVid1Gui and carVid1Gui.Parent then
+        carVid1Gui:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Parent = game:GetService("CoreGui")
+    screenGui.IgnoreGuiInset = true
+    screenGui.Name = "CarVid1"
+
+    local videoScreen = Instance.new("VideoFrame")
+    videoScreen.Parent = screenGui
+    videoScreen.Size = UDim2.new(0.5, 0, 0.5, 0)
+    videoScreen.Position = UDim2.new(0.25, 0, 0.25, 0)
+    videoScreen.BorderSizePixel = 0
+    videoScreen.BackgroundTransparency = 1
+
+    local drag = Instance.new("UIDragDetector", videoScreen)
+
+    pcall(function()
+        writefile("carvid1.mp4", game:HttpGet("https://github.com/t3rm1n4tor/leviathanScriptik/blob/main/Videos/VID_20250709_172217_191.mp4?raw=true"))
+        videoScreen.Video = getcustomasset("carvid1.mp4")
+        videoScreen.Looped = true
+        videoScreen.Playing = true
+        videoScreen.Volume = 0
+    end)
+
+    carVid1Gui = screenGui
+end
+
+local function disableCarVid1()
+    if carVid1Gui and carVid1Gui.Parent then
+        carVid1Gui:Destroy()
+        carVid1Gui = nil
+    end
+end
+
+carVid1Button.Detector.MouseButton1Click:Connect(function()
+    carVid1Enabled = not carVid1Enabled
+
+    if carVid1Enabled then
+        carVid1Button.ButtonText.Text = "DISABLE"
+        carVid1Button.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        createCarVid1()
+    else
+        carVid1Button.ButtonText.Text = "CAR VID"
+        carVid1Button.BackgroundColor3 = buttonColor
+        disableCarVid1()
+    end
+
+    createClickEffect(carVid1Button)
+end)
+
+-- CAR VID2
+local carVid2Button = createStylishButton("CarVid2Button", "CAR VID2", 
+    UDim2.new(0, 220, 0, 50),
+    UDim2.new(0, 0, 0, 530),
+    buttonColor,
+    playerScrollFrame)
+carVid2Button.LayoutOrder = 11
+setupButtonEffects(carVid2Button, buttonColor, Color3.fromRGB(60, 60, 100))
+
+local carVid2Enabled = false
+local carVid2Gui = nil
+
+local function createCarVid2()
+    if carVid2Gui and carVid2Gui.Parent then
+        carVid2Gui:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Parent = game:GetService("CoreGui")
+    screenGui.IgnoreGuiInset = true
+    screenGui.Name = "CarVid2"
+
+    local videoScreen = Instance.new("VideoFrame")
+    videoScreen.Parent = screenGui
+    videoScreen.Size = UDim2.new(0.5, 0, 0.5, 0)
+    videoScreen.Position = UDim2.new(0.25, 0, 0.25, 0)
+    videoScreen.BorderSizePixel = 0
+    videoScreen.BackgroundTransparency = 1
+
+    local drag = Instance.new("UIDragDetector", videoScreen)
+
+    pcall(function()
+        writefile("carvid2.mp4", game:HttpGet("https://github.com/t3rm1n4tor/leviathanScriptik/blob/main/Videos/VID_20250709_172213_674.mp4?raw=true"))
+        videoScreen.Video = getcustomasset("carvid2.mp4")
+        videoScreen.Looped = true
+        videoScreen.Playing = true
+        videoScreen.Volume = 0
+    end)
+
+    carVid2Gui = screenGui
+end
+
+local function disableCarVid2()
+    if carVid2Gui and carVid2Gui.Parent then
+        carVid2Gui:Destroy()
+        carVid2Gui = nil
+    end
+end
+
+carVid2Button.Detector.MouseButton1Click:Connect(function()
+    carVid2Enabled = not carVid2Enabled
+
+    if carVid2Enabled then
+        carVid2Button.ButtonText.Text = "DISABLE"
+        carVid2Button.BackgroundColor3 = Color3.fromRGB(220, 150, 40)
+        createCarVid2()
+    else
+        carVid2Button.ButtonText.Text = "CAR VID2"
+        carVid2Button.BackgroundColor3 = buttonColor
+        disableCarVid2()
+    end
+
+    createClickEffect(carVid2Button)
+end)
+
+-- Update canvas size for player scroll frame
+updatePlayerScrollCanvas()
+
+
+-- Set up button effects
+setupButtonEffects(antiknockButton, buttonColor, Color3.fromRGB(60, 60, 100))
+-- Setup button effects
+setupButtonEffects(tpUpButton, buttonColor, Color3.fromRGB(60, 60, 100))
+setupButtonEffects(tpDownButton, buttonColor, Color3.fromRGB(60, 60, 100))
+setupButtonEffects(autobuyToggleButton, buttonColor, Color3.fromRGB(60, 60, 100))
+setupButtonEffects(autolockButton, buttonColor, Color3.fromRGB(60, 60, 100))
+
+-- Connect Steal category button events
+tpUpButton.Detector.MouseButton1Click:Connect(function() 
+    teleportUp()
+    createClickEffect(tpUpButton)
+end)
+
+tpDownButton.Detector.MouseButton1Click:Connect(function() 
+    teleportDown()
+    createClickEffect(tpDownButton)
+end)
+
+-- Connect autolock button
+autolockButton.Detector.MouseButton1Click:Connect(function()
+    if autolockEnabled then
+        cancelAutolock()
+    else
+        runAutolock()
+    end
+    createClickEffect(autolockButton)
+end)
+
+-- Connect autobuy events
+autobuyToggleButton.Detector.MouseButton1Click:Connect(function()
+    setAutobuy(not autobuyEnabled)
+    createClickEffect(autobuyToggleButton)
+end)
+
+priceTextbox.Input.FocusLost:Connect(function(enterPressed)
+    local input = priceTextbox.Input.Text
+    local num = tonumber(input)
+    
+    if num then
+        minPrice = num
+    else
+        -- Try to parse it as a formatted price
+        local parsed = parsePrice(input)
+        if parsed > 0 then
+            minPrice = parsed
+        else
+            priceTextbox.Input.Text = ""
+        end
+    end
+end)
+
+
+-- Make UI draggable
+local isDragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+titleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDragging = false
+    end
+end)
+
+-- Fix the InputChanged connection
+UserInputService.InputChanged:Connect(function(input)
+    if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Clean up
+Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        if autobuyConnection then
+            autobuyConnection:Disconnect()
+        end
+        if autolockConnection then
+            autolockConnection:Disconnect()
+        end
+        gui:Destroy()
+        -- Removed the problematic line
+    end
+end)
+
+-- Capture all services and functions we need in local variables
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- Safe button creation function
+local function CreateFloatingButton()
+    -- Create the ScreenGui container
+    local floatingGui = Instance.new("ScreenGui")
+    floatingGui.Name = "LeviathanFloatingButton"
+    floatingGui.ResetOnSpawn = false
+    floatingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Try to parent to CoreGui, fall back to PlayerGui
+    local success = pcall(function()
+        floatingGui.Parent = CoreGui
+    end)
+    
+    if not success then
+        floatingGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+    
+    -- Create the floating button
+    local floatingButton = Instance.new("Frame")
+    floatingButton.Name = "Button"
+    floatingButton.Size = UDim2.new(0, 50, 0, 50)
+    floatingButton.Position = UDim2.new(0, 20, 0.5, -25)
+    floatingButton.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+    floatingButton.BorderSizePixel = 0
+    floatingButton.ZIndex = 100
+    floatingButton.Parent = floatingGui
+    
+    -- Create rounded corners
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(1, 0)
+    buttonCorner.Parent = floatingButton
+    
+    -- Create stroke
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.Color = Color3.fromRGB(0, 200, 255)
+    buttonStroke.Thickness = 2
+    buttonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    buttonStroke.Parent = floatingButton
+    
+    -- Create the logo
+    local logoText = Instance.new("TextLabel")
+    logoText.Name = "Logo"
+    logoText.Size = UDim2.new(1, 0, 1, 0)
+    logoText.BackgroundTransparency = 1
+    logoText.Font = Enum.Font.GothamBold
+    logoText.Text = "L"
+    logoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    logoText.TextSize = 24
+    logoText.ZIndex = 101
+    logoText.Parent = floatingButton
+    
+    -- Create click detector
+    local buttonDetector = Instance.new("TextButton")
+    buttonDetector.Name = "Detector"
+    buttonDetector.Size = UDim2.new(1, 0, 1, 0)
+    buttonDetector.BackgroundTransparency = 1
+    buttonDetector.Text = ""
+    buttonDetector.ZIndex = 102
+    buttonDetector.Parent = floatingButton
+    
+    -- Create glow effect
+    local glowEffect = Instance.new("ImageLabel")
+    glowEffect.Name = "Glow"
+    glowEffect.Size = UDim2.new(1.5, 0, 1.5, 0)
+    glowEffect.Position = UDim2.new(0.5, 0, 0.5, 0)
+    glowEffect.AnchorPoint = Vector2.new(0.5, 0.5)
+    glowEffect.BackgroundTransparency = 1
+    glowEffect.Image = "rbxassetid://4996891970" -- Radial gradient
+    glowEffect.ImageColor3 = Color3.fromRGB(0, 150, 255)
+    glowEffect.ImageTransparency = 0.7
+    glowEffect.ZIndex = 99
+    glowEffect.Parent = floatingButton
+    
+    -- Create the interface panel
+    local interfacePanel = Instance.new("Frame")
+    interfacePanel.Name = "InterfacePanel"
+    interfacePanel.Size = UDim2.new(0, 0, 0, 300)
+    interfacePanel.Position = UDim2.new(0, 75, 0.5, -150)
+    interfacePanel.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    interfacePanel.BorderSizePixel = 0
+    interfacePanel.Visible = false
+    interfacePanel.ZIndex = 95
+    interfacePanel.Parent = floatingGui
+    
+    -- Create panel corners
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 12)
+    panelCorner.Parent = interfacePanel
+    
+    -- Create panel stroke
+    local panelStroke = Instance.new("UIStroke")
+    panelStroke.Color = Color3.fromRGB(0, 200, 255)
+    panelStroke.Thickness = 2
+    panelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    panelStroke.Parent = interfacePanel
+    
+    -- Create panel gradient
+    local panelGradient = Instance.new("UIGradient")
+    panelGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
+    }
+    panelGradient.Rotation = 45
+    panelGradient.Parent = interfacePanel
+    
+    -- Create panel title
+    local panelTitle = Instance.new("TextLabel")
+    panelTitle.Name = "Title"
+    panelTitle.Size = UDim2.new(1, 0, 0, 40)
+    panelTitle.Position = UDim2.new(0, 0, 0, 10)
+    panelTitle.BackgroundTransparency = 1
+    panelTitle.Font = Enum.Font.GothamBold
+    panelTitle.Text = "LEVIATHAN"
+    panelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    panelTitle.TextSize = 20
+    panelTitle.ZIndex = 96
+    panelTitle.Parent = interfacePanel
+    
+    -- Create subtitle
+    local panelSubtitle = Instance.new("TextLabel")
+    panelSubtitle.Name = "Subtitle"
+    panelSubtitle.Size = UDim2.new(1, 0, 0, 20)
+    panelSubtitle.Position = UDim2.new(0, 0, 0, 40)
+    panelSubtitle.BackgroundTransparency = 1
+    panelSubtitle.Font = Enum.Font.Gotham
+    panelSubtitle.Text = "Premium Interface"
+    panelSubtitle.TextColor3 = Color3.fromRGB(150, 150, 200)
+    panelSubtitle.TextSize = 14
+    panelSubtitle.ZIndex = 96
+    panelSubtitle.Parent = interfacePanel
+    
+    -- Create decorative line
+    local decorLine = Instance.new("Frame")
+    decorLine.Name = "DecorLine"
+    decorLine.Size = UDim2.new(0.8, 0, 0, 2)
+    decorLine.Position = UDim2.new(0.1, 0, 0, 70)
+    decorLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    decorLine.BorderSizePixel = 0
+    decorLine.ZIndex = 96
+    decorLine.Parent = interfacePanel
+    
+    -- Create line gradient
+    local lineGradient = Instance.new("UIGradient")
+    lineGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 0, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+    }
+    lineGradient.Parent = decorLine
+    
+    -- Create content text
+    local contentText = Instance.new("TextLabel")
+    contentText.Name = "Content"
+    contentText.Size = UDim2.new(0.9, 0, 0, 200)
+    contentText.Position = UDim2.new(0.05, 0, 0, 90)
+    contentText.BackgroundTransparency = 1
+    contentText.Font = Enum.Font.Gotham
+    contentText.Text = "Welcome to Leviathan Premium.\n\nThis exclusive interface gives you access to advanced features and settings.\n\nEnjoy your enhanced experience!"
+    contentText.TextColor3 = Color3.fromRGB(230, 230, 255)
+    contentText.TextSize = 14
+    contentText.TextWrapped = true
+    contentText.TextXAlignment = Enum.TextXAlignment.Left
+    contentText.TextYAlignment = Enum.TextYAlignment.Top
+    contentText.ZIndex = 96
+    contentText.Parent = interfacePanel
+    
+    -- Interface state variables
+    local interfaceOpen = false
+    local isDragging = false
+    local dragStart = nil
+    local startPos = nil
+    local targetPanelWidth = 250
+    
+    -- Create click effect function
+    local function createClickEffect()
+        local clickEffect = Instance.new("Frame")
+        clickEffect.Name = "ClickEffect"
+        clickEffect.AnchorPoint = Vector2.new(0.5, 0.5)
+        clickEffect.Position = UDim2.new(0.5, 0, 0.5, 0)
+        clickEffect.Size = UDim2.new(0, 0, 0, 0)
+        clickEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        clickEffect.BackgroundTransparency = 0.8
+        clickEffect.ZIndex = 103
+        clickEffect.Parent = floatingButton
+        
+        local cornerEffect = Instance.new("UICorner")
+        cornerEffect.CornerRadius = UDim.new(1, 0)
+        cornerEffect.Parent = clickEffect
+        
+        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(clickEffect, tweenInfo, {
+            Size = UDim2.new(1.5, 0, 1.5, 0),
+            BackgroundTransparency = 1
+        })
+        
+        tween:Play()
+        tween.Completed:Connect(function()
+            clickEffect:Destroy()
+        end)
+    end
+    
+    -- Set up connections
+    local connections = {}
+    
+    -- RGB animation connection
+    table.insert(connections, RunService.Heartbeat:Connect(function()
+        local h = (tick() % 5) / 5
+        local color = Color3.fromHSV(h, 1, 1)
+        
+        buttonStroke.Color = color
+        glowEffect.ImageColor3 = color
+        panelStroke.Color = color
+        
+        local offset = (tick() % 5) / 5
+        lineGradient.Offset = Vector2.new(offset, 0)
+    end))
+    
+    -- Button hover effects
+    table.insert(connections, buttonDetector.MouseEnter:Connect(function()
+        local tweenInfo = TweenInfo.new(0.3)
+        
+        local glowTween = TweenService:Create(glowEffect, tweenInfo, {
+            ImageTransparency = 0.5,
+            Size = UDim2.new(1.7, 0, 1.7, 0)
+        })
+        
+        local buttonTween = TweenService:Create(floatingButton, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Size = UDim2.new(0, 55, 0, 55),
+            Position = UDim2.new(0, 17.5, 0.5, -27.5)
+        })
+        
+        local strokeTween = TweenService:Create(buttonStroke, tweenInfo, {
+            Thickness = 3
+        })
+        
+        glowTween:Play()
+        buttonTween:Play()
+        strokeTween:Play()
+    end))
+    
+    table.insert(connections, buttonDetector.MouseLeave:Connect(function()
+        local tweenInfo = TweenInfo.new(0.3)
+        
+        local glowTween = TweenService:Create(glowEffect, tweenInfo, {
+            ImageTransparency = 0.7,
+            Size = UDim2.new(1.5, 0, 1.5, 0)
+        })
+        
+        local buttonTween = TweenService:Create(floatingButton, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Size = UDim2.new(0, 50, 0, 50),
+            Position = UDim2.new(0, 20, 0.5, -25)
+        })
+        
+        local strokeTween = TweenService:Create(buttonStroke, tweenInfo, {
+            Thickness = 2
+        })
+        
+        glowTween:Play()
+        buttonTween:Play()
+        strokeTween:Play()
+    end))
+    
+    -- Button click
+    table.insert(connections, buttonDetector.MouseButton1Click:Connect(function()
+        interfaceOpen = not interfaceOpen
+        
+        if interfaceOpen then
+            interfacePanel.Size = UDim2.new(0, 0, 0, 300)
+            interfacePanel.Visible = true
+            
+            createClickEffect()
+            
+            local panelTween = TweenService:Create(
+                interfacePanel,
+                TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                {Size = UDim2.new(0, targetPanelWidth, 0, 300)}
+            )
+            
+            local logoTween = TweenService:Create(
+                logoText,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {Rotation = 45, TextSize = 28}
+            )
+            
+            panelTween:Play()
+            logoTween:Play()
+        else
+            createClickEffect()
+            
+            local closeTween = TweenService:Create(
+                interfacePanel,
+                TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                {Size = UDim2.new(0, 0, 0, 300)}
+            )
+            
+            local logoTween = TweenService:Create(
+                logoText,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {Rotation = 0, TextSize = 24}
+            )
+            
+            closeTween:Play()
+            logoTween:Play()
+            
+            closeTween.Completed:Connect(function()
+                interfacePanel.Visible = false
+            end)
+        end
+    end))
+    
+    -- Button dragging
+    table.insert(connections, buttonDetector.MouseButton2Down:Connect(function()
+        isDragging = true
+        dragStart = UserInputService:GetMouseLocation()
+        startPos = floatingButton.Position
+    end))
+    
+    table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            isDragging = false
+        end
+    end))
+    
+    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = UserInputService:GetMouseLocation() - dragStart
+            floatingButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end))
+    
+    -- Clean up function
+    local function cleanUp()
+        for _, connection in ipairs(connections) do
+            if connection.Connected then
+                connection:Disconnect()
+            end
+        end
+        floatingGui:Destroy()
+    end
+    
+    -- Return cleanup function
+    return cleanUp
+end
+
+-- Create the button and get the cleanup function
+local cleanUpButton = CreateFloatingButton()
+
+-- Optional: Connect cleanup to character removal
+if game.Players.LocalPlayer then
+    local characterCleanup
+    characterCleanup = game.Players.LocalPlayer.CharacterRemoving:Connect(function()
+        characterCleanup:Disconnect()
+        cleanUpButton()
+    end)
+end
+
+task.delay(0.5, function()
+showNotification("Leviathan BETA", "Welcome!", "success", 2)
+end)
